@@ -28,16 +28,20 @@ export function DistributeBox({ code }: { code: string }) {
   const [result, setResult] = useState<PackingUnitDTO | null>(null);
   const { busy, error, run } = useAction();
 
-  const box = useSWR(['box', code], () => api.packingUnitByCode(code).catch(() => null));
+  const box = useSWR(
+    ['box', code],
+    () => api.packingUnitByCode(code).catch(() => null),
+    { revalidateOnFocus: false, revalidateOnReconnect: false, revalidateIfStale: false },
+  );
   const unit = box.data ?? null;
 
   useEffect(() => {
     if (unit) setDraft(emptyDraft(unit.items));
   }, [unit]);
 
-  function submit(id: number) {
+  function submit(id: number, room: string) {
     void run(
-      () => api.distributePackingUnit(id, distributeRequest(draft, atRoom)),
+      () => api.distributePackingUnit(id, distributeRequest(draft, room)),
       (distributed) => {
         setResult(distributed);
         setStep('done');
@@ -71,7 +75,9 @@ export function DistributeBox({ code }: { code: string }) {
         atRoom={atRoom}
         onChange={setAtRoom}
         // A personal carton has nothing to tick — straight to the write (flow note Fn).
-        onConfirm={() => (needsItemStep(open) ? setStep('items') : submit(open.id))}
+        onConfirm={(room) => (needsItemStep(open) ? (setAtRoom(room), setStep('items')) : submit(open.id, room))}
+        busy={busy}
+        error={error}
       />
     );
   }
@@ -80,7 +86,7 @@ export function DistributeBox({ code }: { code: string }) {
     return (
       <DistributeRecheck
         short={short}
-        onSubmit={() => submit(open.id)}
+        onSubmit={() => submit(open.id, atRoom)}
         onBack={() => setStep('items')}
         busy={busy}
         error={error}
@@ -105,7 +111,7 @@ export function DistributeBox({ code }: { code: string }) {
       {error && <Banner tone="danger">{error}</Banner>}
 
       <div className="sticky bottom-0 -mx-4 border-t border-subtle bg-surface p-4">
-        <Button busy={busy} onClick={() => (short.length > 0 ? setStep('recheck') : submit(open.id))}>
+        <Button busy={busy} onClick={() => (short.length > 0 ? setStep('recheck') : submit(open.id, atRoom))}>
           {short.length > 0 ? `סיום פיזור (${short.length} בחוסר)` : 'סיום פיזור הפריטים'}
         </Button>
       </div>

@@ -11,11 +11,15 @@ export function RoomConfirm({
   atRoom,
   onChange,
   onConfirm,
+  busy,
+  error,
 }: {
   unit: PackingUnitDTO;
   atRoom: string;
   onChange: (room: string) => void;
-  onConfirm: () => void;
+  onConfirm: (room: string) => void;
+  busy: boolean;
+  error: string | null;
 }) {
   const [elsewhere, setElsewhere] = useState(false);
   const warning = roomWarning(unit, atRoom);
@@ -36,13 +40,14 @@ export function RoomConfirm({
           <Button
             onClick={() => {
               onChange(unit.destRoom ?? '');
-              onConfirm();
+              onConfirm(unit.destRoom ?? '');
             }}
-            disabled={!unit.destRoom}
+            disabled={!unit.destRoom || busy}
+            busy={busy}
           >
             אני ב{unit.destRoom ?? 'חדר היעד'}
           </Button>
-          <Button variant="secondary" onClick={() => setElsewhere(true)}>
+          <Button variant="secondary" onClick={() => setElsewhere(true)} disabled={busy}>
             אני בחדר אחר
           </Button>
         </Card>
@@ -50,7 +55,8 @@ export function RoomConfirm({
         <Card className="flex flex-col gap-3">
           <TextField label="החדר שאני נמצא בו" value={atRoom} onChange={onChange} autoFocus />
           {warning && <Banner tone="warn">{warning}</Banner>}
-          <Button onClick={onConfirm} disabled={atRoom.trim().length === 0}>
+          {error && <Banner tone="danger">{error}</Banner>}
+          <Button onClick={() => onConfirm(atRoom)} disabled={atRoom.trim().length === 0 || busy} busy={busy}>
             המשך לפיזור
           </Button>
         </Card>
