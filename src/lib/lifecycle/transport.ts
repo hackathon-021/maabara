@@ -1,11 +1,11 @@
-import type { CreateTransportReq, LoadReq, TransportUnitDTO } from '@/lib/contracts';
-import { db } from '@/lib/db';
+import type { CreateTransportReq, ItemStatus, LoadReq, ReceiveReq, ReceiveResult, TransportUnitDTO } from '@/lib/contracts';
+import { db, type Tx } from '@/lib/db';
 import { Errors } from '@/lib/errors';
 import type { Actor } from '@/lib/session';
 import { normalizeCode } from './dto';
 import { formatHe, notify, recordEvent } from './events';
 import { loadTransportUnitDTO } from './queries';
-import { assertTransition } from './transitions';
+import { assertTransition, TRANSPORT_UNLOADED } from './transitions';
 
 export async function createTransportUnit(actor: Actor, req: CreateTransportReq): Promise<TransportUnitDTO> {
   return db.$transaction(async (tx) => {
@@ -85,6 +85,127 @@ export async function loadTransportUnit(
       });
 
       return loadTransportUnitDTO(tx, truck.id);
+    },
+    { timeout: 15_000 },
+  );
+}
+
+const SURPLUS_NOTE = 'עודף — התקבלה למרות שלא הועמסה על יחידת הובלה זו';
+
+/** Moves every item of a box to the same status as the box, each with its own event. */
+async function setItemsStatus(
+  tx: Tx,
+  actor: Actor,
+  packingUnitId: number,
+  to: ItemStatus,
+  note?: string,
+): Promise<void> {
+  const items = await tx.packingUnitItem.findMany({ where: { packingUnitId } });
+  for (const item of items) {
+    assertTransition('packing_unit_item', item.itemStatus, to);
+    await tx.packingUnitItem.update({ where: { id: item.id }, data: { itemStatus: to } });
+    await recordEvent(tx, {
+      entityType: 'packing_unit_item', entityId: item.id, fromStatus: item.itemStatus, toStatus: to,
+      actorId: actor.id, note,
+    });
+  }
+}
+
+async function markBox(
+  tx: Tx,
+  actor: Actor,
+  unit: { id: number; status: string },
+  to: 'received' | 'missing',
+  note?: string,
+  attachToTruckId?: number,
+): Promise<void> {
+  assertTransition('packing_unit', unit.status, to);
+  await tx.packingUnit.update({
+    where: { id: unit.id },
+    data: { status: to, ...(attachToTruckId === undefined ? {} : { transportUnitId: attachToTruckId }) },
+  });
+  await recordEvent(tx, {
+    entityType: 'packing_unit', entityId: unit.id, fromStatus: unit.status, toStatus: to, actorId: actor.id, note,
+  });
+  await setItemsStatus(tx, actor, unit.id, to === 'received' ? 'received' : 'missing', note);
+}
+
+/**
+ * Spec §5.3. Sent once with the final set of codes. Anything loaded on this truck that the
+ * unloader did not confirm becomes `missing` — never silently dropped (spec §3 invariant 3).
+ */
+export async function receiveTransportUnit(
+  actor: Actor,
+  transportUnitId: number,
+  req: ReceiveReq,
+): Promise<ReceiveResult> {
+  return db.$transaction(
+    async (tx) => {
+      const truck = await tx.transportUnit.findUnique({
+        where: { id: transportUnitId },
+        include: { packingUnits: true },
+      });
+      if (!truck) throw Errors.notFound('יחידת הובלה');
+      assertTransition('transport_unit', truck.status, TRANSPORT_UNLOADED);
+
+      const onTruck = new Map(
+        truck.packingUnits.filter((u) => u.code !== null).map((u) => [normalizeCode(u.code!), u]),
+      );
+      const surplusSet = new Set(req.surplusCodes.map(normalizeCode));
+      // One set for both lists: a code listed twice, or in both lists, is handled exactly once.
+      const confirmed = new Set([...req.receivedCodes, ...req.surplusCodes].map(normalizeCode));
+
+      const receivedCodes: string[] = [];
+      const surplusCodes: string[] = [];
+      for (const code of confirmed) {
+        const unit = onTruck.get(code);
+        if (unit) {
+          // A code the unloader flagged as surplus that IS on this truck is a normal receive.
+          await markBox(tx, actor, unit, 'received');
+          receivedCodes.push(code);
+          continue;
+        }
+        if (!surplusSet.has(code)) throw Errors.notOnThisTruck(code);
+        const foreign = await tx.packingUnit.findUnique({ where: { code } });
+        if (!foreign) throw Errors.notFound(`אריזה ${code}`);
+        await markBox(tx, actor, foreign, 'received', SURPLUS_NOTE, truck.id);
+        surplusCodes.push(code);
+      }
+
+      const missingCodes: string[] = [];
+      for (const [code, unit] of onTruck) {
+        if (confirmed.has(code)) continue;
+        await markBox(tx, actor, unit, 'missing', `לא נפרקה מ${truck.licensePlate}`);
+        missingCodes.push(code);
+      }
+
+      const releasedAt = new Date();
+      await recordEvent(tx, {
+        entityType: 'transport_unit', entityId: truck.id, fromStatus: truck.status, toStatus: TRANSPORT_UNLOADED,
+        actorId: actor.id,
+      });
+      assertTransition('transport_unit', TRANSPORT_UNLOADED, 'released');
+      await tx.transportUnit.update({ where: { id: truck.id }, data: { status: 'released', releasedAt } });
+      await recordEvent(tx, {
+        entityType: 'transport_unit', entityId: truck.id, fromStatus: TRANSPORT_UNLOADED, toStatus: 'released',
+        actorId: actor.id,
+      });
+
+      const missingText = missingCodes.length === 0 ? 'ללא חוסרים' : `אריזות חסרות: ${missingCodes.join(', ')}`;
+      await notify(tx, {
+        entityType: 'transport_unit',
+        entityId: truck.id,
+        body:
+          `יחידת הובלה שוחררה — מס' רישוי ${truck.licensePlate}, ` +
+          `התקבלו ${receivedCodes.length + surplusCodes.length} אריזות, ${missingText}, ${formatHe(releasedAt)}`,
+      });
+
+      return {
+        transportUnit: await loadTransportUnitDTO(tx, truck.id),
+        receivedCodes: receivedCodes.sort(),
+        missingCodes: missingCodes.sort(),
+        surplusCodes: surplusCodes.sort(),
+      };
     },
     { timeout: 15_000 },
   );

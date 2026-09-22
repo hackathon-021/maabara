@@ -1,7 +1,7 @@
 import { db } from '@/lib/db';
-import type { PackingUnitDTO, PackingUnitType, Role } from '@/lib/contracts';
+import type { PackingUnitDTO, PackingUnitType, Role, TransportUnitDTO } from '@/lib/contracts';
 import type { Actor } from '@/lib/session';
-import { closePackingUnit, openPackingUnit, setPackingUnitItems } from '@/lib/lifecycle';
+import { closePackingUnit, createTransportUnit, loadTransportUnit, openPackingUnit, setPackingUnitItems } from '@/lib/lifecycle';
 
 /** Turns a fixture user id into the Actor every lifecycle action expects. */
 export async function actorOf(userId: number): Promise<Actor> {
@@ -27,4 +27,17 @@ export async function packBox(actor: Actor, opts: PackBoxOptions): Promise<Packi
   }
   const { unit: closed } = await closePackingUnit(actor, unit.id, opts.dest ?? DEFAULT_DEST);
   return closed;
+}
+
+/** Creates a truck and sends it off with the given box codes. */
+export async function loadTruck(
+  actor: Actor,
+  opts: { groupId: number; codes: string[]; licensePlate?: string },
+): Promise<TransportUnitDTO> {
+  const truck = await createTransportUnit(actor, {
+    type: 'truck',
+    licensePlate: opts.licensePlate ?? '12-345-67',
+    groupId: opts.groupId,
+  });
+  return loadTransportUnit(actor, truck.id, { codes: opts.codes });
 }
