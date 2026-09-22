@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Design tokens — design/design.md. Tailwind v4 turns each --color-* into bg-*/text-*/border-* utilities. */
+/* Design tokens — design/design.md. Tailwind v4 turns each --color-x into bg-x, text-x, and border-x utilities. */
 @theme {
   --color-primary: #5F42FF;
   --color-primary-soft: #D7D0FF;

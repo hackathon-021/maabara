@@ -12,7 +12,7 @@ export default async function FieldHome() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-white">
+      <p className="text-ink">
         שלום {actor.name}
         {actor.role && ` · ${ROLE_LABELS[actor.role]}`}
       </p>
@@ -28,7 +28,7 @@ export default async function FieldHome() {
 
       {others.length > 0 && (
         <>
-          <p className="mt-2 text-sm text-white/80">{primary ? 'פעולות נוספות' : 'בחרו פעולה'}</p>
+          <p className="mt-2 text-sm text-ink-muted">{primary ? 'פעולות נוספות' : 'בחרו פעולה'}</p>
           <div className="flex flex-col gap-3">
             {others.map((action) => (
               <Link key={action.href} href={action.href} className="block">
