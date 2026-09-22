@@ -1,6 +1,6 @@
 import { handle } from '@/lib/api/respond';
-import { listPackingUnitsQuery } from '@/lib/api/schemas';
-import { listPackingUnits } from '@/lib/lifecycle';
+import { listPackingUnitsQuery, openPackingUnitSchema } from '@/lib/api/schemas';
+import { listPackingUnits, openPackingUnit } from '@/lib/lifecycle';
 import { requireActor } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -14,5 +14,12 @@ export async function GET(req: Request) {
       roomId: p.get('roomId') ?? undefined,
     });
     return listPackingUnits(filter);
+  });
+}
+
+export async function POST(req: Request) {
+  return handle(async () => {
+    const actor = await requireActor();
+    return openPackingUnit(actor, openPackingUnitSchema.parse(await req.json()));
   });
 }
