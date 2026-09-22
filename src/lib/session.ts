@@ -1,5 +1,8 @@
+import { redirect } from 'next/navigation';
+import { auth } from '@/auth';
 import type { Role } from '@/lib/contracts';
 import { db } from '@/lib/db';
+import { Errors } from '@/lib/errors';
 
 export interface Actor {
   id: number;
@@ -19,11 +22,24 @@ export async function devActor(): Promise<Actor> {
   return { id: u.id, name: u.name, email: u.email, role: u.role as Role | null };
 }
 
-// TODO(P1 Task 5): replace with the Auth.js session. Until then every request is the dev user.
+async function currentActor(): Promise<Actor | null> {
+  // TODO: local-dev escape hatch. Must never be set in production (P1 Task 6).
+  if (process.env.AUTH_BYPASS === '1') return devActor();
+  const session = await auth();
+  if (!session?.appUserId) return null;
+  const u = await db.user.findUnique({ where: { id: session.appUserId } });
+  return u ? { id: u.id, name: u.name, email: u.email, role: u.role as Role | null } : null;
+}
+
 export async function requireActor(): Promise<Actor> {
-  return devActor();
+  const actor = await currentActor();
+  if (!actor) throw Errors.unauthenticated();
+  return actor;
 }
 
 export async function requirePageActor(): Promise<Actor> {
-  return devActor();
+  const actor = await currentActor();
+  if (!actor) redirect('/login');
+  if (!actor.role) redirect('/role');
+  return actor;
 }
