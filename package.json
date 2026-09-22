@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "prisma migrate dev",
-    "db:test:migrate": "dotenv -e .env.test -- prisma migrate deploy",
+    "db:test:migrate": "dotenv run -f .env.test --override -- prisma migrate deploy",
     "demo:reset": "prisma db seed"
   },
   "prisma": {
