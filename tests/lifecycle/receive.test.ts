@@ -79,6 +79,48 @@ describe('receive a transport unit', () => {
     expect(event.note).toContain('עודף');
   });
 
+  it('receives a closed surplus box that was never loaded, and the rest of the truck still unloads', async () => {
+    // Never loaded onto any truck — closed is the only status it can be in.
+    const codeC = (await packBox(actor, { roomId: fx.roomB, items: [{ mappingReportId: fx.reports.chair, quantity: 1 }] })).code!;
+
+    const result = await receiveTransportUnit(actor, truckId, {
+      receivedCodes: [codeA, codeB],
+      surplusCodes: [codeC],
+    });
+
+    expect(result.receivedCodes).toEqual([codeA, codeB].sort());
+    expect(result.surplusCodes).toEqual([codeC]);
+    expect(result.transportUnit.status).toBe('released');
+    const surplus = await db.packingUnit.findFirstOrThrow({ where: { code: codeC }, include: { items: true } });
+    expect(surplus.status).toBe('received');
+    expect(surplus.transportUnitId).toBe(truckId);
+    expect(surplus.items.map((i) => i.itemStatus)).toEqual(['received']);
+    const event = await db.statusEvent.findFirstOrThrow({
+      where: { entityType: 'packing_unit', entityId: surplus.id, toStatus: 'received' },
+    });
+    expect(event.fromStatus).toBe('closed');
+    expect(event.note).toContain('עודף');
+  });
+
+  it('rejects a surplus box in a status that cannot be received, and leaves the truck untouched', async () => {
+    const codeC = (await packBox(actor, { roomId: fx.roomB, items: [{ mappingReportId: fx.reports.chair, quantity: 1 }] })).code!;
+    // Receive it once for real, so its status becomes 'received' — not a valid surplus source.
+    const other = await createTransportUnit(actor, { type: 'truck', licensePlate: '77-777-77', groupId: fx.groupId });
+    await loadTransportUnit(actor, other.id, { codes: [codeC] });
+    await receiveTransportUnit(actor, other.id, { receivedCodes: [codeC], surplusCodes: [] });
+
+    await expect(
+      receiveTransportUnit(actor, truckId, { receivedCodes: [codeA, codeB], surplusCodes: [codeC] }),
+    ).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(
+      receiveTransportUnit(actor, truckId, { receivedCodes: [codeA, codeB], surplusCodes: [codeC] }),
+    ).rejects.toMatchObject({ messageHe: expect.stringContaining(codeC) });
+
+    // Nothing on the target truck moved — the whole unload was rolled back.
+    expect((await db.transportUnit.findUniqueOrThrow({ where: { id: truckId } })).status).toBe('in_transit');
+    expect((await db.packingUnit.findFirstOrThrow({ where: { code: codeA } })).status).toBe('in_transit');
+  });
+
   it('rejects a code that is neither on the truck nor confirmed as surplus', async () => {
     const stray = (await packBox(actor, { roomId: fx.roomB, items: [{ mappingReportId: fx.reports.chair, quantity: 1 }] })).code!;
     await expect(

@@ -73,7 +73,8 @@ describe('the full evacuation chain', () => {
 
     expect(done.status).toBe('distributed');
     expect(await db.packingUnitItem.count()).toBe(0);
-    // A personal carton never closes its source room.
-    expect((await db.room.findUniqueOrThrow({ where: { id: fx.roomA } })).status).toBe('packing');
+    // A personal carton never touches its source room's status — it doesn't even flip it to
+    // 'packing', or a room with nothing but personal cartons would never leave that state.
+    expect((await db.room.findUniqueOrThrow({ where: { id: fx.roomA } })).status).toBe('done');
   });
 });

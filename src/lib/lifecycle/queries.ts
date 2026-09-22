@@ -43,6 +43,8 @@ export async function packableReports(
   roomId: number,
   excludePackingUnitId?: number,
 ): Promise<PackableReport[]> {
+  // TODO: remaining is read outside a lock — two concurrent PUT /items on one report can both
+  // pass. Single-operator demo, so not worth SELECT FOR UPDATE here.
   const reports = await client.mappingReport.findMany({
     where: { roomId, isAvailable: true, status: { in: ['transfer', 'salvage'] } },
     include: { subCategory: true },

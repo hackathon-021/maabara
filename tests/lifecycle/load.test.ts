@@ -62,11 +62,12 @@ describe('load a transport unit', () => {
     expect(await db.notification.count()).toBe(0);
   });
 
-  it('rejects a box that is already on another truck, and changes nothing', async () => {
+  it('rejects a box that is already on another truck, names it in the message, and changes nothing', async () => {
     await loadTransportUnit(actor, truckId, { codes: [codeA] });
     const second = await createTransportUnit(actor, { type: 'truck', licensePlate: '99-888-77', groupId: fx.groupId });
     await expect(loadTransportUnit(actor, second.id, { codes: [codeA, codeB] })).rejects.toMatchObject({
-      code: 'ILLEGAL_TRANSITION',
+      code: 'VALIDATION',
+      messageHe: expect.stringContaining(codeA),
     });
     expect((await db.packingUnit.findFirstOrThrow({ where: { code: codeB } })).status).toBe('closed');
   });

@@ -56,6 +56,22 @@ describe('close a packing unit', () => {
     expect(roomEvents.map((e) => e.toStatus)).toEqual(['packing', 'closed']);
   });
 
+  it('does not close the room while another of its boxes is still open', async () => {
+    const openBox = await openPackingUnit(actor, { sourceRoomId: fx.roomA, type: 'professional_carton' });
+    await setPackingUnitItems(actor, openBox.id, { items: [{ mappingReportId: fx.reports.laptop, quantity: 2 }] });
+    // openBox is left open on purpose — the monitor box below is the last thing `remaining` needs.
+
+    const { roomCheck } = await closePackingUnit(
+      actor,
+      await openWith(fx.roomA, [{ mappingReportId: fx.reports.monitor, quantity: 1 }]),
+      DEST,
+    );
+
+    expect(roomCheck).toEqual({ remaining: 0, disposalRemaining: 0, roomStatus: 'packing' });
+    expect((await db.room.findUniqueOrThrow({ where: { id: fx.roomA } })).status).toBe('packing');
+    expect((await db.packingUnit.findUniqueOrThrow({ where: { id: openBox.id } })).status).toBe('open');
+  });
+
   it('sends a room with leftover disposal items to awaiting_disposal', async () => {
     const { roomCheck } = await closePackingUnit(
       actor,
@@ -65,13 +81,30 @@ describe('close a packing unit', () => {
     expect(roomCheck).toEqual({ remaining: 0, disposalRemaining: 1, roomStatus: 'awaiting_disposal' });
   });
 
-  it('skips the room check for a personal carton', async () => {
+  it('skips the room check for a personal carton and never flips the room into packing', async () => {
     const unit = await openPackingUnit(actor, { sourceRoomId: fx.roomA, type: 'personal_carton' });
     const { unit: closed, roomCheck } = await closePackingUnit(actor, unit.id, DEST);
     expect(roomCheck).toBeNull();
     expect(closed.code).toMatch(/^\d{5}$/);
     expect(closed.items).toEqual([]);
-    expect((await db.room.findUniqueOrThrow({ where: { id: fx.roomA } })).status).toBe('packing');
+    // A personal carton alone must not drag a 'done' room into 'packing' — it would never leave.
+    expect((await db.room.findUniqueOrThrow({ where: { id: fx.roomA } })).status).toBe('done');
+  });
+
+  it('still allows a personal carton once the room has auto-closed', async () => {
+    await closePackingUnit(actor, await openWith(fx.roomA, [{ mappingReportId: fx.reports.laptop, quantity: 2 }]), DEST);
+    const { roomCheck } = await closePackingUnit(
+      actor,
+      await openWith(fx.roomA, [{ mappingReportId: fx.reports.monitor, quantity: 1 }]),
+      DEST,
+    );
+    expect(roomCheck?.roomStatus).toBe('closed');
+
+    const personal = await openPackingUnit(actor, { sourceRoomId: fx.roomA, type: 'personal_carton' });
+    const { unit: closed, roomCheck: personalRoomCheck } = await closePackingUnit(actor, personal.id, DEST);
+    expect(personalRoomCheck).toBeNull();
+    expect(closed.code).toMatch(/^\d{5}$/);
+    expect((await db.room.findUniqueOrThrow({ where: { id: fx.roomA } })).status).toBe('closed');
   });
 
   it('refuses to close an empty non-personal box', async () => {

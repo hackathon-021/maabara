@@ -1,11 +1,12 @@
 import type { CreateTransportReq, ItemStatus, LoadReq, ReceiveReq, ReceiveResult, TransportUnitDTO } from '@/lib/contracts';
 import { db, type Tx } from '@/lib/db';
 import { Errors } from '@/lib/errors';
+import { statusLabel } from '@/lib/labels';
 import type { Actor } from '@/lib/session';
 import { normalizeCode } from './dto';
 import { formatHe, notify, recordEvent } from './events';
 import { loadTransportUnitDTO } from './queries';
-import { assertTransition, TRANSPORT_UNLOADED } from './transitions';
+import { assertTransition, PACKING_UNIT_TRANSITIONS, TRANSPORT_UNLOADED } from './transitions';
 
 export async function createTransportUnit(actor: Actor, req: CreateTransportReq): Promise<TransportUnitDTO> {
   return db.$transaction(async (tx) => {
@@ -51,11 +52,18 @@ export async function loadTransportUnit(
       const byCode = new Map(units.map((u) => [normalizeCode(u.code ?? ''), u]));
 
       // Validate everything before writing anything: a bad code must leave the truck untouched.
+      // Illegal-transition codes are collected and reported together — with 20 boxes in one scan
+      // batch, "cannot move from X to Y" alone doesn't tell the operator which box to remove.
+      const badCodes: string[] = [];
       for (const code of codes) {
         const unit = byCode.get(code);
         if (!unit) throw Errors.notFound(`אריזה ${code}`);
-        assertTransition('packing_unit', unit.status, 'in_transit');
+        const allowed: readonly string[] | undefined = (
+          PACKING_UNIT_TRANSITIONS as Record<string, readonly string[]>
+        )[unit.status];
+        if (!allowed?.includes('in_transit')) badCodes.push(code);
       }
+      if (badCodes.length > 0) throw Errors.validation(`אריזות שלא ניתן להעמיס: ${badCodes.join(', ')}`);
 
       const departedAt = new Date();
       for (const code of codes) {
@@ -131,6 +139,45 @@ async function markBox(
 }
 
 /**
+ * A surplus box was found physically on this truck, so the scan itself is the evidence — the box
+ * demonstrably travelled even if the normal packing_unit transition table never saw it leave.
+ * `closed` (never loaded, e.g. found after `loadTransportUnit`'s one-shot submit already ran) and
+ * `missing` (unconfirmed on an earlier truck's unload — spec §4 addendum) are both accepted; any
+ * other status is a scanning mistake, not a surplus box, and must not roll back the rest of the
+ * unload, so it is reported by name instead of thrown as a generic illegal-transition error.
+ */
+const SURPLUS_RECEIVABLE_STATUSES: readonly string[] = ['in_transit', 'closed', 'missing'];
+
+async function markSurplusReceived(
+  tx: Tx,
+  actor: Actor,
+  foreign: { id: number; status: string; code: string | null },
+  truckId: number,
+): Promise<void> {
+  if (!SURPLUS_RECEIVABLE_STATUSES.includes(foreign.status)) {
+    throw Errors.validation(
+      `אריזה ${foreign.code} בסטטוס "${statusLabel('packing_unit', foreign.status)}" — לא ניתן לקבלה כעודף`,
+    );
+  }
+  await tx.packingUnit.update({
+    where: { id: foreign.id },
+    data: { status: 'received', transportUnitId: truckId },
+  });
+  await recordEvent(tx, {
+    entityType: 'packing_unit', entityId: foreign.id, fromStatus: foreign.status, toStatus: 'received',
+    actorId: actor.id, note: SURPLUS_NOTE,
+  });
+  const items = await tx.packingUnitItem.findMany({ where: { packingUnitId: foreign.id } });
+  for (const item of items) {
+    await tx.packingUnitItem.update({ where: { id: item.id }, data: { itemStatus: 'received' } });
+    await recordEvent(tx, {
+      entityType: 'packing_unit_item', entityId: item.id, fromStatus: item.itemStatus, toStatus: 'received',
+      actorId: actor.id, note: SURPLUS_NOTE,
+    });
+  }
+}
+
+/**
  * Spec §5.3. Sent once with the final set of codes. Anything loaded on this truck that the
  * unloader did not confirm becomes `missing` — never silently dropped (spec §3 invariant 3).
  */
@@ -168,7 +215,7 @@ export async function receiveTransportUnit(
         if (!surplusSet.has(code)) throw Errors.notOnThisTruck(code);
         const foreign = await tx.packingUnit.findUnique({ where: { code } });
         if (!foreign) throw Errors.notFound(`אריזה ${code}`);
-        await markBox(tx, actor, foreign, 'received', SURPLUS_NOTE, truck.id);
+        await markSurplusReceived(tx, actor, foreign, truck.id);
         surplusCodes.push(code);
       }
 

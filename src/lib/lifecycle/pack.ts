@@ -15,7 +15,9 @@ export async function openPackingUnit(actor: Actor, req: OpenPackingUnitReq): Pr
   return db.$transaction(async (tx) => {
     const room = await tx.room.findUnique({ where: { id: req.sourceRoomId } });
     if (!room) throw Errors.notFound('חדר');
-    assertRoomPackable(room);
+    // A personal carton holds personal gear that is not in the mapping report: it neither
+    // consumes `remaining` nor runs the room check, so a closed room must not block it.
+    if (req.type !== 'personal_carton') assertRoomPackable(room);
 
     const unit = await tx.packingUnit.create({
       data: { type: req.type, status: 'open', sourceRoomId: room.id, packedById: actor.id },
@@ -24,8 +26,9 @@ export async function openPackingUnit(actor: Actor, req: OpenPackingUnitReq): Pr
       entityType: 'packing_unit', entityId: unit.id, fromStatus: null, toStatus: 'open', actorId: actor.id,
     });
 
-    // The first box opened in a mapped room moves it to 'packing'; later boxes find it already there.
-    if (room.status === 'done') {
+    // The first box opened in a mapped room moves it to 'packing'; later boxes find it already
+    // there. A personal carton never drives this — it must not drag a 'done' room into 'packing'.
+    if (req.type !== 'personal_carton' && room.status === 'done') {
       assertTransition('room', room.status, 'packing');
       await tx.room.update({ where: { id: room.id }, data: { status: 'packing' } });
       await recordEvent(tx, {
@@ -105,7 +108,12 @@ async function applyRoomCheck(tx: Tx, actor: Actor, roomId: number): Promise<Roo
   const { remaining, disposalRemaining } = await roomTotals(tx, roomId);
   let status = room.status as RoomStatus;
 
-  if (remaining === 0) {
+  // An open box may still hold items that never make it into `remaining` (they were already
+  // moved out of the mapping report once put in the box) — closing the room out from under it
+  // would strand the box with no code, unloadable and invisible to every exception panel.
+  const openBoxes = await tx.packingUnit.count({ where: { sourceRoomId: roomId, status: 'open' } });
+
+  if (remaining === 0 && openBoxes === 0) {
     const next: RoomStatus = disposalRemaining > 0 ? 'awaiting_disposal' : 'closed';
     if (next !== status && ROOM_TRANSITIONS[status].includes(next)) {
       await tx.room.update({ where: { id: roomId }, data: { status: next } });
