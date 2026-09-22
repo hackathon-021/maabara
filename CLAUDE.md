@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code when working in this repository.
 
-## Project: המעברה (HaMa'avara)
+## Project: המעברה (HaMa'abara)
 
 **⚠️ HACKATHON MVP — this is a proof-of-concept built for a hackathon, not a production system.**
 Prioritize speed, working end-to-end demos, and clarity over robustness, scalability, or full security hardening. When in doubt between "quick and demoable" and "correct and complete," prefer the former and leave a `// TODO` note explaining the shortcut.
@@ -34,10 +34,9 @@ Before planning or writing any code, **explicitly consult these folders**. Do no
 | `/flows` | Describes the end-to-end system processes for each user type (packer, driver, receiver, commander, etc.) | Before implementing any feature — confirm the flow it belongs to |
 | `/personas` | Defines all customer/user types (field soldier, packer, driver, room officer, ops commander, etc.) | Before designing any screen or interaction — confirm whose need it serves |
 | `/wiki` | Contains the ERD (data model) and the API specification for the system | Before touching the data layer or any API endpoint — this is the source of truth for schema and contracts |
-| `/skills` | Describes system capabilities/features | Before scoping a feature — check whether it's already defined here |
 | `/design` | The system's design/UI template and visual language | Before building any UI component — follow this, do not invent a new style |
 
-**Rule of thumb:** if a task touches user experience → check `/flows` + `/personas` + `/design`. If it touches data or backend → check `/wiki`. If it touches scope/capabilities → check `/skills`.
+**Rule of thumb:** if a task touches user experience → check `/flows` + `/personas` + `/design`. If it touches data or backend → check `/wiki`.
 
 ---
 
