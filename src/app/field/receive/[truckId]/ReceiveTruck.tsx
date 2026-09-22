@@ -9,7 +9,7 @@ import { api } from '@/lib/api/client';
 import type { ReceiveResult } from '@/lib/contracts';
 import { PACKING_UNIT_TYPE_LABELS, TRANSPORT_TYPE_LABELS } from '@/lib/labels';
 import { feedback } from '@/lib/feedback';
-import { addCode } from '@/lib/scan-session';
+import { addCode, removeCode } from '@/lib/scan-session';
 import { classifyReceiveScan, expectedCodes, surplusVerdict, unconfirmedCodes } from '../logic';
 import { ReceiveDone } from './ReceiveDone';
 import { ReceiveRecheck } from './ReceiveRecheck';
@@ -144,7 +144,26 @@ export function ReceiveTruck({ truckId }: { truckId: number }) {
           })}
         </ul>
         {surplus.length > 0 && (
-          <p className="mt-3 text-sm text-warn">התקבלו בעודף: {surplus.join(', ')}</p>
+          <div className="mt-3">
+            <p className="mb-2 text-sm font-bold text-warn">התקבלו בעודף:</p>
+            {/* Each surplus code gets its own remove control — if another unloader receives the
+                same box first (as surplus, on a different truck), this phone's submit would fail
+                on that one code with no way back short of a page refresh that drops everything. */}
+            <ul className="flex flex-wrap gap-2">
+              {surplus.map((code) => (
+                <li key={code}>
+                  <button
+                    type="button"
+                    onClick={() => setSurplus((prev) => removeCode(prev, code))}
+                    className="flex items-center gap-2 rounded-card border-2 border-warn bg-warn-soft px-3 py-1 text-sm text-warn"
+                  >
+                    <span className="tabular-nums">{code}</span>
+                    <span aria-hidden>✕</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </Card>
 

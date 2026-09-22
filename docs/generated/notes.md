@@ -5,7 +5,7 @@
 - Scanning: `<ScanOrType onCode={...} />` — camera plus keypad, hands back normalized 5-digit codes.
 - The camera needs HTTPS. On the deployed URL it works; over plain HTTP from a phone it falls back to the keypad.
 - Every flow sends exactly one write, at the end. A scan is validated when it is scanned, never at submit.
-- Surplus at receive is only offered for a box that is `in_transit` — anything else would fail the whole unload.
+- Surplus at receive is offered for a box that is `in_transit`, `closed`, or `missing` — matching what the server accepts (per the spec §4 addendum the server comment cites) and, notably, letting a `missing` box be recovered by scanning it onto a truck as surplus. Anything else (not found, or a status already further along such as `received`/`distributed`) would fail the whole unload if offered.
 - Known shortcut: no offline mode, which the distributor persona asks for. Call it out in the demo.
 - **Environment note for whoever runs this next**: this build environment had no Docker/WSL2, so the usual `docker compose` test-DB path was unavailable. A real local PostgreSQL 14 (installed separately on this machine, already running as a Windows service, unrelated to this project) was used instead: created an isolated `maabara_test` database, ran `prisma migrate deploy` against it, and pointed `.env`/`.env.test` at it. `npm test` passes 265/265 across the whole repo with this DB. If you hit the same "no Docker" wall, this is a viable fallback — just don't point it at someone else's existing Postgres database, always create a fresh one.
 - **What was actually verified end-to-end in this run (real server + real Postgres, via `npm run dev` + direct API calls — no browser, no phone, no camera):**

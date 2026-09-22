@@ -66,6 +66,12 @@ export function LoadTruck({ truckId }: { truckId: number }) {
   }
 
   const availableBoxes = available.data ?? [];
+  // A code can be picked here while another phone loads the same box first — SWR's next
+  // revalidation then drops it from `availableBoxes`, but it's still in `picked` and still
+  // going out in the final submit. Without its own row it can never be un-picked short of a
+  // page refresh (which would drop every other pick too). Render it separately so it always
+  // has a remove control, regardless of whether the source list still lists it.
+  const stalePicked = picked.filter((code) => !availableBoxes.some((b) => b.code === code));
 
   return (
     <div className="flex flex-col gap-4">
@@ -119,6 +125,32 @@ export function LoadTruck({ truckId }: { truckId: number }) {
           </ul>
         )}
       </Card>
+
+      {stalePicked.length > 0 && (
+        <Card>
+          <p className="mb-2 font-bold">אריזות שנוספו וכבר אינן ברשימה</p>
+          <p className="mb-2 text-sm text-ink-muted">
+            ייתכן שנתפסו על ידי מכשיר אחר בינתיים. ניתן להסיר אותן מכאן.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {stalePicked.map((code) => (
+              <li key={code}>
+                <button
+                  type="button"
+                  onClick={() => setPicked((p) => removeCode(p, code))}
+                  aria-pressed
+                  className="flex min-h-16 w-full items-center justify-between gap-3 rounded-card border-2 border-primary bg-primary-soft px-4 text-right"
+                >
+                  <span className="block font-bold tabular-nums">{code}</span>
+                  <span aria-hidden className="text-2xl text-primary">
+                    ✓
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {error && <Banner tone="danger">{error}</Banner>}
 

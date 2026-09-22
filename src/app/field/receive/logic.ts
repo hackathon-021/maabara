@@ -30,18 +30,26 @@ export function classifyReceiveScan(
 }
 
 /**
+ * Statuses P2 accepts for a surplus receive (spec §5.3.2, and the §4 addendum for `missing`).
+ * Mirrors `SURPLUS_RECEIVABLE_STATUSES` in `src/lib/lifecycle/transport.ts` — keep the two in sync.
+ * `missing` is the one path anywhere in the system that can recover a box once lost, so it must
+ * stay offered here, not rejected client-side before the server ever sees the scan.
+ */
+const SURPLUS_RECEIVABLE_STATUSES: readonly string[] = ['in_transit', 'closed', 'missing'];
+
+/**
  * Whether a box that is not on this truck may be offered as surplus (spec §5.3.2).
  *
- * P2 accepts a surplus code only as `in_transit → received`; anything else throws
- * and the *entire* receive is rolled back, taking every other box's confirmation
- * with it. So the prompt is only ever shown for a box the server will accept.
+ * P2 accepts a surplus code only from `in_transit`, `closed`, or `missing`; anything else throws
+ * and the *entire* receive is rolled back, taking every other box's confirmation with it. So the
+ * prompt is only ever shown for a box the server will accept.
  */
 export function surplusVerdict(
   code: string,
   unit: PackingUnitDTO | null,
 ): { kind: 'offer' | 'reject'; messageHe: string } {
   if (!unit) return { kind: 'reject', messageHe: `אריזה ${code} לא נמצאה` };
-  if (unit.status !== 'in_transit') {
+  if (!SURPLUS_RECEIVABLE_STATUSES.includes(unit.status)) {
     return {
       kind: 'reject',
       messageHe: `אריזה ${code} בסטטוס "${PACKING_UNIT_STATUS_LABELS[unit.status]}" ולא ניתן לקבל אותה כאן`,

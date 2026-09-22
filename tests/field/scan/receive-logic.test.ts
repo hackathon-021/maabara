@@ -96,10 +96,10 @@ describe('surplusVerdict', () => {
     expect(surplusVerdict('99999', null)).toEqual({ kind: 'reject', messageHe: 'אריזה 99999 לא נמצאה' });
   });
 
-  it('rejects a box that is still closed at the source', () => {
+  it('offers a box that is closed at the source', () => {
     const v = surplusVerdict('10009', box('closed'));
-    expect(v.kind).toBe('reject');
-    expect(v.messageHe).toContain('אריזה נסגרה');
+    expect(v.kind).toBe('offer');
+    expect(v.messageHe).toBe('אריזה 10009 לא הועמסה על יחידת הובלה זו. לקבל בכל זאת?');
   });
 
   it('rejects a box that was already received', () => {
@@ -108,8 +108,10 @@ describe('surplusVerdict', () => {
     expect(v.messageHe).toContain('אריזה התקבלה');
   });
 
-  it('rejects a box already marked missing', () => {
-    expect(surplusVerdict('10009', box('missing')).kind).toBe('reject');
+  it('offers a box already marked missing — the one path back from lost', () => {
+    const v = surplusVerdict('10009', box('missing'));
+    expect(v.kind).toBe('offer');
+    expect(v.messageHe).toBe('אריזה 10009 לא הועמסה על יחידת הובלה זו. לקבל בכל זאת?');
   });
 });
 
