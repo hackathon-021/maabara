@@ -228,7 +228,7 @@ export async function dashboardExceptions(): Promise<DashboardDTO['exceptions']>
 /** The mocked SMS outbox, newest first. */
 export async function dashboardNotifications(): Promise<DashboardDTO['notifications']> {
   const rows = await db.notification.findMany({
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     // TODO: the feed is a demo artefact; a cap keeps it readable across rehearsals.
     take: 20,
   });
