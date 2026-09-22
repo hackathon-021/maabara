@@ -5,10 +5,19 @@ import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { Banner, Button, Card, describeError, Spinner, useAction } from '@/components/ui';
 import { api } from '@/lib/api/client';
-import type { PackingUnitDTO } from '@/lib/contracts';
+import type { ClosePackingUnitResult, PackingUnitDTO } from '@/lib/contracts';
 import { PACKING_UNIT_TYPE_LABELS } from '@/lib/labels';
-import { canLeaveContents, draftToRequest, draftTotal, itemRows, needsItems } from '../logic';
+import {
+  canLeaveContents,
+  draftToRequest,
+  draftTotal,
+  itemRows,
+  needsItems,
+  normalizeDestination,
+} from '../logic';
+import { DestinationForm } from './DestinationForm';
 import { ItemPicker } from './ItemPicker';
+import { PackDone } from './PackDone';
 
 /**
  * The open box survives a refresh in sessionStorage — there is no GET /api/packing-units/:id
@@ -34,17 +43,25 @@ export function cacheUnit(unit: PackingUnitDTO): void {
   }
 }
 
+type Step = 'contents' | 'destination' | 'done';
+
 export function PackUnit({ unitId }: { unitId: number }) {
   const [unit, setUnit] = useState<PackingUnitDTO | null>(null);
   const [draft, setDraft] = useState<Record<number, number>>({});
+  const [dest, setDest] = useState({ destBuilding: '', destFloor: '', destRoom: '' });
+  const [result, setResult] = useState<ClosePackingUnitResult | null>(null);
+  const [step, setStep] = useState<Step>('contents');
   const { busy, error, run } = useAction();
 
   useEffect(() => {
-    setUnit(readCachedUnit(unitId));
+    const cached = readCachedUnit(unitId);
+    setUnit(cached);
+    // A personal carton has no contents step at all (spec §5.1).
+    if (cached && !needsItems(cached.type)) setStep('destination');
   }, [unitId]);
 
   // Loaded once per box and never re-fetched — see Conventions #2.
-  const packable = useSWR(unit ? ['packable', unit.sourceRoomId] : null, () =>
+  const packable = useSWR(unit && needsItems(unit.type) ? ['packable', unit.sourceRoomId] : null, () =>
     api.packableItems((unit as PackingUnitDTO).sourceRoomId),
   );
 
@@ -55,21 +72,54 @@ export function PackUnit({ unitId }: { unitId: number }) {
     setDraft(Object.fromEntries(rows.map((r) => [r.mappingReportId, r.initial])));
   }, [rows]);
 
-  if (!unit) return <MissingUnitCard />;
-
-  if (!needsItems(unit.type)) {
-    // Personal carton: no contents at all (spec §5.1). Task 8 renders the destination step here.
-    return <PersonalCartonNotice unit={unit} />;
-  }
-
   function saveAndContinue() {
     void run(
       () => api.setPackingUnitItems(unitId, draftToRequest(draft)),
       (updated) => {
         setUnit(updated);
         cacheUnit(updated);
-        // Task 8 replaces this with a move to the destination step.
+        setStep('destination');
       },
+    );
+  }
+
+  function close() {
+    const req = normalizeDestination(dest);
+    if (!req) return;
+    void run(
+      () => api.closePackingUnit(unitId, req),
+      (closed) => {
+        setResult(closed);
+        setStep('done');
+        try {
+          sessionStorage.removeItem(key(unitId));
+        } catch {
+          // Nothing to clean up. The box is closed either way.
+        }
+      },
+    );
+  }
+
+  if (!unit) return <MissingUnitCard />;
+  if (step === 'done' && result) return <PackDone result={result} />;
+
+  if (step === 'destination') {
+    return (
+      <div className="flex flex-col gap-4">
+        <Card>
+          <p className="font-bold">{unit.sourceRoomName}</p>
+          <p className="text-sm text-ink-muted">
+            {PACKING_UNIT_TYPE_LABELS[unit.type]}
+            {needsItems(unit.type) && ` · ${draftTotal(draft)} פריטים`}
+          </p>
+        </Card>
+        {needsItems(unit.type) && (
+          <Button variant="quiet" size="md" onClick={() => setStep('contents')}>
+            חזרה לבחירת פריטים
+          </Button>
+        )}
+        <DestinationForm value={dest} onChange={setDest} onSubmit={close} busy={busy} error={error} />
+      </div>
     );
   }
 
@@ -103,15 +153,6 @@ export function PackUnit({ unitId }: { unitId: number }) {
         </Button>
       </div>
     </div>
-  );
-}
-
-function PersonalCartonNotice({ unit }: { unit: PackingUnitDTO }) {
-  return (
-    <Card>
-      <p className="font-bold">{PACKING_UNIT_TYPE_LABELS[unit.type]}</p>
-      <p className="mt-1 text-sm text-ink-muted">בקרטון אישי לא מסמנים פריטים — ממשיכים ישר להזנת היעד.</p>
-    </Card>
   );
 }
 

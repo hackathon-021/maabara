@@ -1,5 +1,7 @@
 import {
   PACKABLE_ROOM_STATUSES,
+  type ClosePackingUnitReq,
+  type ClosePackingUnitResult,
   type PackableItemDTO,
   type PackingUnitItemDTO,
   type PackingUnitType,
@@ -95,4 +97,56 @@ export function draftTotal(draft: Record<number, number>): number {
 /** A non-personal box with nothing in it is rejected by the server — block it on the phone. */
 export function canLeaveContents(type: PackingUnitType, draft: Record<number, number>): boolean {
   return !needsItems(type) || draftTotal(draft) > 0;
+}
+
+/** Trims the destination, or returns null if any part of it is blank. */
+export function normalizeDestination(d: {
+  destBuilding: string;
+  destFloor: string;
+  destRoom: string;
+}): ClosePackingUnitReq | null {
+  const destBuilding = d.destBuilding.trim();
+  const destFloor = d.destFloor.trim();
+  const destRoom = d.destRoom.trim();
+  if (!destBuilding || !destFloor || !destRoom) return null;
+  return { destBuilding, destFloor, destRoom };
+}
+
+export interface Completion {
+  title: string;
+  lines: string[];
+  tone: 'ok' | 'warn';
+  canPackMore: boolean;
+}
+
+/**
+ * What the packer is told after a box closes (flows/packing_flow.md nodes N–T).
+ * The room status is always the server's word — the client never decides a room is closed.
+ */
+export function completionSummary({ unit, roomCheck }: ClosePackingUnitResult): Completion {
+  const lines = [`מספר אריזה: ${unit.code ?? '—'}`];
+
+  // A personal carton skips the room check entirely (spec §5.1).
+  if (roomCheck === null) {
+    return { title: 'יחידת אריזה הושלמה', lines, tone: 'ok', canPackMore: true };
+  }
+
+  if (roomCheck.remaining > 0) {
+    lines.push(`נותרו בחדר ${roomCheck.remaining} פריטים לאריזה`);
+    return { title: 'יחידת אריזה הושלמה', lines, tone: 'ok', canPackMore: true };
+  }
+
+  if (roomCheck.roomStatus === 'closed') {
+    lines.push('כל הפריטים בחדר נארזו');
+    return { title: 'חדר סגור', lines, tone: 'ok', canPackMore: false };
+  }
+
+  if (roomCheck.roomStatus === 'awaiting_disposal') {
+    lines.push('כל הפריטים לאריזה נארזו');
+    lines.push(`נותרו בחדר ${roomCheck.disposalRemaining} פריטים לגריטה`);
+    return { title: 'ממתין לגריטה', lines, tone: 'warn', canPackMore: false };
+  }
+
+  // Nothing remaining but the room is still open — trust the server, offer to keep packing.
+  return { title: 'יחידת אריזה הושלמה', lines, tone: 'ok', canPackMore: true };
 }

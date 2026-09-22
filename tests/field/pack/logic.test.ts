@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import type { PackableItemDTO, PackingUnitItemDTO, RoomDTO } from '@/lib/contracts';
-import { canLeaveContents, draftToRequest, draftTotal, isRoomPackable, itemRows, needsItems, roomHintHe } from '@/app/field/pack/logic';
+import type { ClosePackingUnitResult, PackableItemDTO, PackingUnitDTO, PackingUnitItemDTO, RoomDTO } from '@/lib/contracts';
+import {
+  canLeaveContents,
+  completionSummary,
+  draftToRequest,
+  draftTotal,
+  isRoomPackable,
+  itemRows,
+  needsItems,
+  normalizeDestination,
+  roomHintHe,
+} from '@/app/field/pack/logic';
 
 const room = (status: RoomDTO['status'], roomManager: string | null = 'רס"ל דנה כהן'): RoomDTO => ({
   id: 1,
@@ -141,5 +151,99 @@ describe('canLeaveContents', () => {
 
   it('lets a personal carton through with no contents at all', () => {
     expect(canLeaveContents('personal_carton', {})).toBe(true);
+  });
+});
+
+const unit = (over: Partial<PackingUnitDTO> = {}): PackingUnitDTO => ({
+  id: 1,
+  code: '10001',
+  type: 'professional_carton',
+  status: 'closed',
+  sourceRoomName: 'חדר 101',
+  destBuilding: 'בניין 7',
+  destFloor: 'קומה 2',
+  destRoom: 'חדר 214',
+  sourceRoomId: 1,
+  groupName: 'ענף תקשוב — מדור מערכות',
+  roomManager: 'רס"ל דנה כהן',
+  transportUnitId: null,
+  packedByName: 'רב"ט ארז כהן',
+  closedAt: '2026-09-22T10:00:00.000Z',
+  items: [],
+  ...over,
+});
+
+describe('normalizeDestination', () => {
+  it('trims every field before it reaches the server', () => {
+    expect(normalizeDestination({ destBuilding: ' בניין 7 ', destFloor: 'קומה 2', destRoom: ' חדר 214' })).toEqual({
+      destBuilding: 'בניין 7',
+      destFloor: 'קומה 2',
+      destRoom: 'חדר 214',
+    });
+  });
+
+  // Review Focus 4: a box addressed to three spaces cannot be delivered.
+  it('rejects a field that is only whitespace', () => {
+    expect(normalizeDestination({ destBuilding: '   ', destFloor: 'קומה 2', destRoom: 'חדר 214' })).toBeNull();
+    expect(normalizeDestination({ destBuilding: 'בניין 7', destFloor: '', destRoom: 'חדר 214' })).toBeNull();
+    expect(normalizeDestination({ destBuilding: 'בניין 7', destFloor: 'קומה 2', destRoom: '\t' })).toBeNull();
+  });
+});
+
+describe('completionSummary', () => {
+  it('reports the code and the remaining work when the room is still being packed', () => {
+    const result: ClosePackingUnitResult = {
+      unit: unit(),
+      roomCheck: { remaining: 2, disposalRemaining: 0, roomStatus: 'packing' },
+    };
+    const s = completionSummary(result);
+    expect(s.title).toBe('יחידת אריזה הושלמה');
+    expect(s.lines[0]).toBe('מספר אריזה: 10001');
+    expect(s.lines).toContain('נותרו בחדר 2 פריטים לאריזה');
+    expect(s).toMatchObject({ tone: 'ok', canPackMore: true });
+  });
+
+  it('announces a closed room when the server closed it', () => {
+    const s = completionSummary({
+      unit: unit(),
+      roomCheck: { remaining: 0, disposalRemaining: 0, roomStatus: 'closed' },
+    });
+    expect(s.title).toBe('חדר סגור');
+    expect(s.lines).toContain('כל הפריטים בחדר נארזו');
+    expect(s.canPackMore).toBe(false);
+  });
+
+  it('announces a room waiting for disposal and says how much is left', () => {
+    const s = completionSummary({
+      unit: unit(),
+      roomCheck: { remaining: 0, disposalRemaining: 1, roomStatus: 'awaiting_disposal' },
+    });
+    expect(s.title).toBe('ממתין לגריטה');
+    expect(s.lines).toContain('נותרו בחדר 1 פריטים לגריטה');
+    expect(s).toMatchObject({ tone: 'warn', canPackMore: false });
+  });
+
+  // Review Focus 5: a personal carton gets no room check at all.
+  it('never prints a null room check for a personal carton', () => {
+    const s = completionSummary({ unit: unit({ type: 'personal_carton' }), roomCheck: null });
+    expect(s.title).toBe('יחידת אריזה הושלמה');
+    expect(s.lines.join(' ')).not.toContain('null');
+    expect(s.lines).toEqual(['מספר אריזה: 10001']);
+    expect(s.canPackMore).toBe(true);
+  });
+
+  // Review Focus 5: nothing left, but the server left the room open.
+  it('does not claim the room closed when the server kept it packing', () => {
+    const s = completionSummary({
+      unit: unit(),
+      roomCheck: { remaining: 0, disposalRemaining: 0, roomStatus: 'packing' },
+    });
+    expect(s.title).toBe('יחידת אריזה הושלמה');
+    expect(s.canPackMore).toBe(true);
+  });
+
+  it('survives a box that somehow came back without a code', () => {
+    const s = completionSummary({ unit: unit({ code: null }), roomCheck: null });
+    expect(s.lines[0]).toBe('מספר אריזה: —');
   });
 });
