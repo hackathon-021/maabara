@@ -8,6 +8,7 @@ import { api } from '@/lib/api/client';
 import { PACKING_UNIT_TYPES, type PackingUnitType } from '@/lib/contracts';
 import { PACKING_UNIT_TYPE_LABELS } from '@/lib/labels';
 import { isRoomPackable, roomHintHe } from './logic';
+import { cacheUnit } from './[unitId]/PackUnit';
 
 export function PackStart({ initialRoomId }: { initialRoomId: number | null }) {
   const router = useRouter();
@@ -42,7 +43,10 @@ export function PackStart({ initialRoomId }: { initialRoomId: number | null }) {
     if (roomId === null || type === null) return;
     void run(
       () => api.openPackingUnit({ sourceRoomId: roomId, type }),
-      (unit) => router.push(`/field/pack/${unit.id}`),
+      (unit) => {
+        cacheUnit(unit);
+        router.push(`/field/pack/${unit.id}`);
+      },
     );
   }
 
