@@ -55,12 +55,13 @@ export function RoomConfirm({
         <Card className="flex flex-col gap-3">
           <TextField label="החדר שאני נמצא בו" value={atRoom} onChange={onChange} autoFocus />
           {warning && <Banner tone="warn">{warning}</Banner>}
-          {error && <Banner tone="danger">{error}</Banner>}
           <Button onClick={() => onConfirm(atRoom)} disabled={atRoom.trim().length === 0 || busy} busy={busy}>
             המשך לפיזור
           </Button>
         </Card>
       )}
+
+      {error && <Banner tone="danger">{error}</Banner>}
     </div>
   );
 }
