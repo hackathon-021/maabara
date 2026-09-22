@@ -60,9 +60,14 @@ export function PackUnit({ unitId }: { unitId: number }) {
     if (cached && !needsItems(cached.type)) setStep('destination');
   }, [unitId]);
 
-  // Loaded once per box and never re-fetched — see Conventions #2.
-  const packable = useSWR(unit && needsItems(unit.type) ? ['packable', unit.sourceRoomId] : null, () =>
-    api.packableItems((unit as PackingUnitDTO).sourceRoomId),
+  // Fetched once per box, then explicitly revalidated only right after a save (see
+  // saveAndContinue's onOk) — never automatically on focus/reconnect/mount. The key is scoped
+  // to the box (not just the room) so packing a second box from the same room in one session
+  // never serves the first box's cached snapshot. See Conventions #2.
+  const packable = useSWR(
+    unit && needsItems(unit.type) ? ['packable', unit.id, unit.sourceRoomId] : null,
+    () => api.packableItems((unit as PackingUnitDTO).sourceRoomId),
+    { revalidateOnFocus: false, revalidateOnReconnect: false, revalidateIfStale: false },
   );
 
   const rows = useMemo(() => itemRows(packable.data ?? [], unit?.items ?? []), [packable.data, unit]);
@@ -78,6 +83,7 @@ export function PackUnit({ unitId }: { unitId: number }) {
       (updated) => {
         setUnit(updated);
         cacheUnit(updated);
+        void packable.mutate();
         setStep('destination');
       },
     );

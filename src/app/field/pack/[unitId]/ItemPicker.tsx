@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Card, EmptyState, Stepper } from '@/components/ui';
 import { MAPPING_STATUS_LABELS } from '@/lib/labels';
 import type { ItemRow } from '../logic';
@@ -18,6 +19,11 @@ export function ItemPicker({
       <EmptyState
         title="אין פריטים לאריזה בחדר הזה"
         body="כל הפריטים שמסומנים כעוברים או כהנצלה כבר נארזו. אפשר לחזור ולבחור חדר אחר."
+        action={
+          <Link href="/field/pack" className="text-link">
+            חזרה לבחירת חדר
+          </Link>
+        }
       />
     );
   }

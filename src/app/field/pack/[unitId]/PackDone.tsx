@@ -25,7 +25,9 @@ export function PackDone({ result }: { result: ClosePackingUnitResult }) {
           <Button onClick={() => router.push(`/field/pack?roomId=${result.unit.sourceRoomId}`)}>
             אריזה נוספת בחדר זה
           </Button>
-          {/* flows/packing_flow.md node U: two ways to stop, and they mean different things to the room. */}
+          {/* TODO: no API exists yet for "packer declares the room finished" while items remain —
+              both buttons below are pure navigation today. Needs a P1/P2 contract addition
+              (flows/packing_flow.md node U) before this distinction can be real. */}
           <Button variant="secondary" onClick={() => router.push('/field/pack')}>
             לא נותרו פריטים לאריזה
           </Button>

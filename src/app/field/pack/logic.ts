@@ -52,6 +52,12 @@ export interface ItemRow {
  * and drops an item once nothing remains. Both are right for a fresh box and wrong for a
  * box being edited, so the box's own rows are added back onto the maximum, and an item
  * that vanished from the room list because it is all in this box is re-added.
+ *
+ * This only produces a correct `max` when `packable` and `saved` describe the same server
+ * snapshot. The caller (PackUnit) guarantees that: the packable-items fetch is cached per box
+ * (not per room) and never revalidated automatically — it is fetched once, then deliberately
+ * refreshed via `mutate()` right after each save — so `remaining` and the box's own saved
+ * quantities always line up instead of double-counting a just-saved quantity.
  */
 export function itemRows(packable: PackableItemDTO[], saved: PackingUnitItemDTO[]): ItemRow[] {
   const mine = new Map(saved.map((s) => [s.mappingReportId, s]));
