@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Mirrored from /wiki/maabara_ERD.md (Phase A) ----------
+// TODO: item_types, user_group, group_codes omitted — not needed for the Phase B demo.
+
+model Group {
+  id             Int             @id @default(autoincrement())
+  name           String
+  isAvailable    Boolean         @default(true) @map("is_available")
+  rooms          Room[]
+  transportUnits TransportUnit[]
+
+  @@map("groups")
+}
+
+model Location {
+  id          Int     @id @default(autoincrement())
+  name        String
+  isAvailable Boolean @default(true) @map("is_available")
+  rooms       Room[]
+
+  @@map("locations")
+}
+
+model Category {
+  id            Int           @id @default(autoincrement())
+  description   String
+  isAvailable   Boolean       @default(true) @map("is_available")
+  subCategories SubCategory[]
+
+  @@map("categories")
+}
+
+model SubCategory {
+  id             Int             @id @default(autoincrement())
+  categoryId     Int             @map("category_id")
+  category       Category        @relation(fields: [categoryId], references: [id])
+  description    String
+  isAvailable    Boolean         @default(true) @map("is_available")
+  mappingReports MappingReport[]
+
+  @@map("sub_categories")
+}
+
+model Room {
+  id               Int             @id @default(autoincrement())
+  groupId          Int             @map("group_id")
+  group            Group           @relation(fields: [groupId], references: [id])
+  locationId       Int?            @map("location_id")
+  location         Location?       @relation(fields: [locationId], references: [id])
+  description      String
+  /// waiting | inProgress | done | packing | closed | awaiting_disposal
+  status           String          @default("waiting")
+  roomManager      String?         @map("room_manager")
+  startMappingTime DateTime?       @map("start_mapping_time")
+  endMappingTime   DateTime?       @map("end_mapping_time")
+  isAvailable      Boolean         @default(true) @map("is_available")
+  mappingReports   MappingReport[]
+  packingUnits     PackingUnit[]
+
+  @@map("rooms")
+}
+
+model MappingReport {
+  id               Int               @id @default(autoincrement())
+  roomId           Int               @map("room_id")
+  room             Room              @relation(fields: [roomId], references: [id])
+  subCategoryId    Int               @map("sub_category_id")
+  subCategory      SubCategory       @relation(fields: [subCategoryId], references: [id])
+  reportedBy       String            @map("reported_by") @db.VarChar(10)
+  reportedOn       DateTime          @default(now()) @map("reported_on")
+  /// transfer | salvage | disposal
+  status           String            @db.VarChar(30)
+  description      String?
+  /// TODO: ERD uses DECIMAL; Int is enough for the demo.
+  quantity         Int               @default(0)
+  serial           String?
+  isAvailable      Boolean           @default(true) @map("is_available")
+  packingUnitItems PackingUnitItem[]
+
+  @@map("mapping_reports")
+}
+
+// ---------- New for Phase B ----------
+
+model User {
+  id                Int             @id @default(autoincrement())
+  email             String          @unique
+  name              String
+  /// packer | transporter | unloader | distributor | commander (null until picked)
+  role              String?
+  identityNum       String?         @map("identity_num") @db.VarChar(10)
+  createdAt         DateTime        @default(now()) @map("created_at")
+  packedUnits       PackingUnit[]   @relation("PackedBy")
+  createdTransports TransportUnit[] @relation("CreatedBy")
+  events            StatusEvent[]
+
+  @@map("users")
+}
+
+model PackingUnit {
+  id              Int               @id @default(autoincrement())
+  code            String?           @unique @db.Char(5)
+  /// professional_carton | personal_carton | pallet | trolley | loose
+  type            String
+  /// open | closed | in_transit | received | missing | distributed | distributed_short
+  status          String            @default("open")
+  sourceRoomId    Int               @map("source_room_id")
+  sourceRoom      Room              @relation(fields: [sourceRoomId], references: [id])
+  destBuilding    String?           @map("dest_building")
+  destFloor       String?           @map("dest_floor")
+  destRoom        String?           @map("dest_room")
+  transportUnitId Int?              @map("transport_unit_id")
+  transportUnit   TransportUnit?    @relation(fields: [transportUnitId], references: [id])
+  packedById      Int               @map("packed_by")
+  packedBy        User              @relation("PackedBy", fields: [packedById], references: [id])
+  openedAt        DateTime          @default(now()) @map("opened_at")
+  closedAt        DateTime?         @map("closed_at")
+  items           PackingUnitItem[]
+
+  @@index([status])
+  @@index([sourceRoomId])
+  @@map("packing_units")
+}
+
+model PackingUnitItem {
+  id                  Int           @id @default(autoincrement())
+  packingUnitId       Int           @map("packing_unit_id")
+  packingUnit         PackingUnit   @relation(fields: [packingUnitId], references: [id], onDelete: Cascade)
+  mappingReportId     Int           @map("mapping_report_id")
+  mappingReport       MappingReport @relation(fields: [mappingReportId], references: [id])
+  quantity            Int
+  distributedQuantity Int           @default(0) @map("distributed_quantity")
+  /// packed | received | distributed | missing | short
+  itemStatus          String        @default("packed") @map("item_status")
+
+  @@unique([packingUnitId, mappingReportId])
+  @@map("packing_unit_items")
+}
+
+model TransportUnit {
+  id           Int           @id @default(autoincrement())
+  /// truck | other
+  type         String
+  typeDetails  String?       @map("type_details")
+  licensePlate String        @map("license_plate")
+  groupId      Int           @map("group_id")
+  group        Group         @relation(fields: [groupId], references: [id])
+  /// loading | in_transit | released
+  status       String        @default("loading")
+  createdById  Int           @map("created_by")
+  createdBy    User          @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime      @default(now()) @map("created_at")
+  departedAt   DateTime?     @map("departed_at")
+  releasedAt   DateTime?     @map("released_at")
+  packingUnits PackingUnit[]
+
+  @@map("transport_units")
+}
+
+/// Append-only audit trail. Never updated or deleted.
+model StatusEvent {
+  id         Int      @id @default(autoincrement())
+  /// packing_unit | packing_unit_item | transport_unit | room
+  entityType String   @map("entity_type")
+  entityId   Int      @map("entity_id")
+  fromStatus String?  @map("from_status")
+  toStatus   String   @map("to_status")
+  actorId    Int      @map("actor_id")
+  actor      User     @relation(fields: [actorId], references: [id])
+  at         DateTime @default(now())
+  note       String?
+
+  @@index([entityType, entityId])
+  @@map("status_events")
+}
+
+/// Mocked SMS outbox, shown on the dashboard.
+model Notification {
+  id         Int      @id @default(autoincrement())
+  channel    String   @default("sms")
+  recipients String
+  body       String
+  entityType String   @map("entity_type")
+  entityId   Int      @map("entity_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
