@@ -1,14 +1,10 @@
-'use client';
+import { LoadStart } from './LoadStart';
 
-import { useState } from 'react';
-import { ScanOrType } from '@/components/ScanOrType';
+export const dynamic = 'force-dynamic';
 
-export default function ScanProbe() {
-  const [codes, setCodes] = useState<string[]>([]);
-  return (
-    <div className="flex flex-col gap-4">
-      <ScanOrType onCode={(c) => setCodes((prev) => [...prev, c])} hint="בדיקת סורק" />
-      <pre className="rounded-card bg-surface p-4">{codes.join('\n')}</pre>
-    </div>
-  );
+// Next.js 15: searchParams is async.
+export default async function LoadPage({ searchParams }: { searchParams: Promise<{ groupId?: string }> }) {
+  const { groupId } = await searchParams;
+  const parsed = Number(groupId);
+  return <LoadStart initialGroupId={Number.isInteger(parsed) && parsed > 0 ? parsed : null} />;
 }
