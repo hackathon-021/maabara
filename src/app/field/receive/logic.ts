@@ -1,5 +1,5 @@
 import type { PackingUnitDTO, TransportUnitDTO, ReceiveResult } from '@/lib/contracts';
-import { PACKING_UNIT_STATUS_LABELS } from '@/lib/labels';
+import { PACKING_UNIT_STATUS_LABELS, TRANSPORT_STATUS_LABELS } from '@/lib/labels';
 import { CODE_LENGTH, normalizeCode } from '@/lib/scan-session';
 
 /** The boxes this truck was loaded with — the checklist the unloader works against. */
@@ -72,7 +72,7 @@ export function receiveSummary(result: ReceiveResult): {
     lines.push(`התקבלו בעודף: ${result.surplusCodes.join(', ')}`);
   }
   if (result.missingCodes.length === 0) {
-    return { title: 'יחידת הובלה שוחררה', tone: 'ok', lines };
+    return { title: TRANSPORT_STATUS_LABELS.released, tone: 'ok', lines };
   }
   lines.push(`חסרות ${result.missingCodes.length} אריזות: ${result.missingCodes.join(', ')}`);
   return { title: 'יחידת הובלה שוחררה עם חוסר', tone: 'warn', lines };
