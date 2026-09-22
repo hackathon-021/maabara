@@ -145,3 +145,117 @@ export async function dashboardTrucks(): Promise<DashboardDTO['trucks']> {
     departedAt: t.departedAt?.toISOString() ?? null,
   }));
 }
+
+/** Nobody to attribute a row to — a seeded box, or one written outside the lifecycle. */
+const UNKNOWN_ACTOR = '—';
+
+/**
+ * Every missing box and every short item, with the last actor and time from
+ * `status_events` (spec §6). A row with no event behind it is still reported —
+ * an unattributed loss is exactly the thing that must not disappear.
+ */
+export async function dashboardExceptions(): Promise<DashboardDTO['exceptions']> {
+  const [missingBoxes, shortItems] = await Promise.all([
+    db.packingUnit.findMany({
+      where: { status: 'missing' },
+      select: {
+        id: true,
+        code: true,
+        openedAt: true,
+        sourceRoom: { select: { description: true } },
+      },
+    }),
+    db.packingUnitItem.findMany({
+      where: { itemStatus: 'short' },
+      select: {
+        id: true,
+        quantity: true,
+        distributedQuantity: true,
+        mappingReport: { select: { subCategory: { select: { description: true } } } },
+        packingUnit: { select: { id: true, code: true, openedAt: true } },
+      },
+    }),
+  ]);
+
+  const events = await db.statusEvent.findMany({
+    where: {
+      OR: [
+        { entityType: 'packing_unit', entityId: { in: missingBoxes.map((b) => b.id) } },
+        { entityType: 'packing_unit_item', entityId: { in: shortItems.map((i) => i.id) } },
+      ],
+    },
+    orderBy: { at: 'desc' },
+    select: { entityType: true, entityId: true, at: true, actor: { select: { name: true } } },
+  });
+
+  // Ordered newest first, so the first row seen for a key is the latest one.
+  const latest = new Map<string, { at: Date; actorName: string }>();
+  for (const e of events) {
+    const key = `${e.entityType}:${e.entityId}`;
+    if (!latest.has(key)) latest.set(key, { at: e.at, actorName: e.actor.name });
+  }
+
+  const rows: DashboardDTO['exceptions'] = [];
+
+  for (const b of missingBoxes) {
+    const last = latest.get(`packing_unit:${b.id}`);
+    rows.push({
+      kind: 'missing_box',
+      packingUnitId: b.id,
+      packingUnitCode: b.code,
+      description: `אריזה ${b.code ?? '—'} מ${b.sourceRoom.description}`,
+      lastActorName: last?.actorName ?? UNKNOWN_ACTOR,
+      at: (last?.at ?? b.openedAt).toISOString(),
+    });
+  }
+
+  for (const i of shortItems) {
+    const last = latest.get(`packing_unit_item:${i.id}`);
+    rows.push({
+      kind: 'short_item',
+      packingUnitId: i.packingUnit.id,
+      packingUnitCode: i.packingUnit.code,
+      description: `${i.mappingReport.subCategory.description}: פוזרו ${i.distributedQuantity} מתוך ${i.quantity}`,
+      lastActorName: last?.actorName ?? UNKNOWN_ACTOR,
+      at: (last?.at ?? i.packingUnit.openedAt).toISOString(),
+    });
+  }
+
+  // ISO strings sort lexicographically, so this is a plain reverse-chronological sort.
+  return rows.sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** The mocked SMS outbox, newest first. */
+export async function dashboardNotifications(): Promise<DashboardDTO['notifications']> {
+  const rows = await db.notification.findMany({
+    orderBy: { createdAt: 'desc' },
+    // TODO: the feed is a demo artefact; a cap keeps it readable across rehearsals.
+    take: 20,
+  });
+  return rows.map((n) => ({
+    id: n.id,
+    body: n.body,
+    recipients: n.recipients,
+    createdAt: n.createdAt.toISOString(),
+  }));
+}
+
+export async function getDashboard(): Promise<DashboardDTO> {
+  const [kpiPart, rooms, trucks, exceptions, notifications] = await Promise.all([
+    dashboardKpis(),
+    dashboardRooms(),
+    dashboardTrucks(),
+    dashboardExceptions(),
+    dashboardNotifications(),
+  ]);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    kpis: kpiPart.kpis,
+    boxCounts: kpiPart.boxCounts,
+    rooms,
+    trucks,
+    exceptions,
+    notifications,
+  };
+}
