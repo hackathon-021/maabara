@@ -3,19 +3,27 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Banner, Button, Card, describeError, Dialog, Spinner } from '@/components/ui';
+import { Banner, Button, Card, describeError, Dialog, Spinner, useAction } from '@/components/ui';
 import { ScanOrType } from '@/components/ScanOrType';
 import { api } from '@/lib/api/client';
+import type { ReceiveResult } from '@/lib/contracts';
 import { PACKING_UNIT_TYPE_LABELS, TRANSPORT_TYPE_LABELS } from '@/lib/labels';
 import { feedback } from '@/lib/feedback';
 import { addCode } from '@/lib/scan-session';
 import { classifyReceiveScan, expectedCodes, surplusVerdict, unconfirmedCodes } from '../logic';
+import { ReceiveDone } from './ReceiveDone';
+import { ReceiveRecheck } from './ReceiveRecheck';
+
+type Step = 'scanning' | 'recheck' | 'done';
 
 export function ReceiveTruck({ truckId }: { truckId: number }) {
   const [confirmed, setConfirmed] = useState<string[]>([]);
   const [surplus, setSurplus] = useState<string[]>([]);
   const [note, setNote] = useState<{ tone: 'ok' | 'warn' | 'danger'; text: string } | null>(null);
   const [ask, setAsk] = useState<{ code: string; messageHe: string } | null>(null);
+  const [step, setStep] = useState<Step>('scanning');
+  const [result, setResult] = useState<ReceiveResult | null>(null);
+  const { busy, error, run } = useAction();
 
   const trucks = useSWR('trucks-in-transit', () => api.transportUnits('in_transit'));
   const truck = trucks.data?.find((t) => t.id === truckId) ?? null;
@@ -53,6 +61,17 @@ export function ReceiveTruck({ truckId }: { truckId: number }) {
     setAsk({ code: scanned.code, messageHe: verdict.messageHe });
   }
 
+  function submit() {
+    void run(
+      () => api.receiveTransportUnit(truckId, { receivedCodes: confirmed, surplusCodes: surplus }),
+      (received) => {
+        setResult(received);
+        setStep('done');
+      },
+    );
+  }
+
+  if (step === 'done' && result) return <ReceiveDone result={result} />;
   if (trucks.error) return <Banner tone="danger">{describeError(trucks.error).messageHe}</Banner>;
   if (!trucks.data) return <Spinner />;
 
@@ -68,7 +87,24 @@ export function ReceiveTruck({ truckId }: { truckId: number }) {
     );
   }
 
+  // Recomputed on every render, so a box found during the recheck leaves the list at once.
   const missing = unconfirmedCodes(expected, confirmed);
+
+  if (step === 'recheck') {
+    return (
+      <ReceiveRecheck
+        missing={missing}
+        onFound={(code) => {
+          setConfirmed((prev) => addCode(prev, code).codes);
+          feedback('success');
+        }}
+        onSubmit={submit}
+        onBack={() => setStep('scanning')}
+        busy={busy}
+        error={error}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -132,12 +168,16 @@ export function ReceiveTruck({ truckId }: { truckId: number }) {
         </div>
       </Dialog>
 
+      {error && <Banner tone="danger">{error}</Banner>}
+
       <div className="sticky bottom-0 -mx-4 border-t border-subtle bg-surface p-4">
         {/* spec §5.3.2: the live counter is what the unloader actually watches. */}
         <p className="mb-2 text-center text-lg font-bold tabular-nums">
           {confirmed.length}/{expected.length}
         </p>
-        <Button disabled>{missing.length > 0 ? `סיום פריקה (${missing.length} חסרות)` : 'סיום פריקה'}</Button>
+        <Button busy={busy} onClick={() => (missing.length > 0 ? setStep('recheck') : submit())}>
+          {missing.length > 0 ? `סיום פריקה (${missing.length} חסרות)` : 'סיום פריקה'}
+        </Button>
       </div>
     </div>
   );

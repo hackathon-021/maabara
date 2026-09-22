@@ -1,4 +1,4 @@
-import type { PackingUnitDTO, TransportUnitDTO } from '@/lib/contracts';
+import type { PackingUnitDTO, TransportUnitDTO, ReceiveResult } from '@/lib/contracts';
 import { PACKING_UNIT_STATUS_LABELS } from '@/lib/labels';
 import { CODE_LENGTH, normalizeCode } from '@/lib/scan-session';
 
@@ -52,4 +52,28 @@ export function surplusVerdict(
 
 export function unconfirmedCodes(expected: string[], confirmed: string[]): string[] {
   return expected.filter((c) => !confirmed.includes(c));
+}
+
+/**
+ * The closing summary of an unload (flows/unloading_flow.md note Ln1).
+ * Everything here comes from the server's result — a code the phone put in
+ * `surplusCodes` that was in fact on the truck comes back as a normal receive.
+ */
+export function receiveSummary(result: ReceiveResult): {
+  title: string;
+  tone: 'ok' | 'warn';
+  lines: string[];
+} {
+  const lines = [
+    `מספר רישוי: ${result.transportUnit.licensePlate}`,
+    `התקבלו ${result.receivedCodes.length} אריזות`,
+  ];
+  if (result.surplusCodes.length > 0) {
+    lines.push(`התקבלו בעודף: ${result.surplusCodes.join(', ')}`);
+  }
+  if (result.missingCodes.length === 0) {
+    return { title: 'יחידת הובלה שוחררה', tone: 'ok', lines };
+  }
+  lines.push(`חסרות ${result.missingCodes.length} אריזות: ${result.missingCodes.join(', ')}`);
+  return { title: 'יחידת הובלה שוחררה עם חוסר', tone: 'warn', lines };
 }

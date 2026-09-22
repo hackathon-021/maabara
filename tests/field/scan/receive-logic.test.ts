@@ -122,3 +122,47 @@ describe('unconfirmedCodes', () => {
     expect(unconfirmedCodes(['10001'], ['10001'])).toEqual([]);
   });
 });
+
+import type { ReceiveResult } from '@/lib/contracts';
+import { receiveSummary } from '@/app/field/receive/logic';
+
+const result = (over: Partial<ReceiveResult> = {}): ReceiveResult => ({
+  transportUnit: { ...truck(['10001', '10002']), status: 'released', releasedAt: new Date(2026, 8, 22, 16, 30).toISOString() },
+  receivedCodes: ['10001', '10002'],
+  missingCodes: [],
+  surplusCodes: [],
+  ...over,
+});
+
+describe('receiveSummary', () => {
+  it('reports a clean unload', () => {
+    const s = receiveSummary(result());
+    expect(s).toMatchObject({ title: 'יחידת הובלה שוחררה', tone: 'ok' });
+    expect(s.lines).toContain('התקבלו 2 אריזות');
+    expect(s.lines).toContain('מספר רישוי: 12-345-67');
+  });
+
+  it('names every missing box and turns the summary amber', () => {
+    const s = receiveSummary(result({ receivedCodes: ['10001'], missingCodes: ['10002'] }));
+    expect(s).toMatchObject({ title: 'יחידת הובלה שוחררה עם חוסר', tone: 'warn' });
+    expect(s.lines).toContain('חסרות 1 אריזות: 10002');
+  });
+
+  it('reports accepted surplus boxes separately', () => {
+    const s = receiveSummary(result({ surplusCodes: ['10009'] }));
+    expect(s.lines).toContain('התקבלו בעודף: 10009');
+  });
+
+  /**
+   * A code the unloader marked surplus that turns out to be on the truck comes back
+   * in receivedCodes, not surplusCodes. The screen reports the server's answer.
+   */
+  it('reads the server lists, not the ones the phone sent', () => {
+    const s = receiveSummary(result({ receivedCodes: ['10001', '10002'], surplusCodes: [] }));
+    expect(s.lines.join(' ')).not.toContain('עודף');
+  });
+
+  it('says nothing about missing boxes when there are none', () => {
+    expect(receiveSummary(result()).lines.join(' ')).not.toContain('חסרות');
+  });
+});
