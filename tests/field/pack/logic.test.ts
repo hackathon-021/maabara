@@ -247,3 +247,31 @@ describe('completionSummary', () => {
     expect(s.lines[0]).toBe('מספר אריזה: —');
   });
 });
+
+import { labelLines } from '@/app/field/pack/logic';
+
+describe('labelLines', () => {
+  it('carries everything the flow says a label must show', () => {
+    expect(labelLines(unit())).toEqual([
+      { label: 'יעד', value: 'בניין 7 · קומה 2 · חדר 214' },
+      { label: 'נארז מחדר', value: 'חדר 101' },
+      { label: 'מדור', value: 'ענף תקשוב — מדור מערכות' },
+      { label: 'אחראי חדר', value: 'רס"ל דנה כהן' },
+      { label: 'ארז', value: 'רב"ט ארז כהן' },
+    ]);
+  });
+
+  it('marks an unknown destination part rather than printing "null"', () => {
+    const lines = labelLines(unit({ destFloor: null }));
+    expect(lines[0].value).toBe('בניין 7 · — · חדר 214');
+  });
+
+  it('drops the room-manager line when nobody is on file', () => {
+    expect(labelLines(unit({ roomManager: null })).map((l) => l.label)).toEqual([
+      'יעד',
+      'נארז מחדר',
+      'מדור',
+      'ארז',
+    ]);
+  });
+});

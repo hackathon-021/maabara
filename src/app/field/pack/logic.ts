@@ -3,6 +3,7 @@ import {
   type ClosePackingUnitReq,
   type ClosePackingUnitResult,
   type PackableItemDTO,
+  type PackingUnitDTO,
   type PackingUnitItemDTO,
   type PackingUnitType,
   type RoomDTO,
@@ -149,4 +150,18 @@ export function completionSummary({ unit, roomCheck }: ClosePackingUnitResult): 
 
   // Nothing remaining but the room is still open — trust the server, offer to keep packing.
   return { title: 'יחידת אריזה הושלמה', lines, tone: 'ok', canPackMore: true };
+}
+
+const or = (value: string | null) => value ?? '—';
+
+/** The printed label's text (flows/packing_flow.md note Nn). The code itself is the QR payload. */
+export function labelLines(unit: PackingUnitDTO): { label: string; value: string }[] {
+  const lines = [
+    { label: 'יעד', value: `${or(unit.destBuilding)} · ${or(unit.destFloor)} · ${or(unit.destRoom)}` },
+    { label: 'נארז מחדר', value: unit.sourceRoomName },
+    { label: 'מדור', value: unit.groupName },
+  ];
+  if (unit.roomManager) lines.push({ label: 'אחראי חדר', value: unit.roomManager });
+  lines.push({ label: 'ארז', value: unit.packedByName });
+  return lines;
 }

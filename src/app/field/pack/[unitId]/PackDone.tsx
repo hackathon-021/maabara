@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Banner, Button, Card } from '@/components/ui';
 import type { ClosePackingUnitResult } from '@/lib/contracts';
 import { completionSummary } from '../logic';
+import { QrLabel } from '@/components/QrLabel';
 
 export function PackDone({ result }: { result: ClosePackingUnitResult }) {
   const router = useRouter();
@@ -17,7 +18,7 @@ export function PackDone({ result }: { result: ClosePackingUnitResult }) {
         ))}
       </Banner>
 
-      {/* Task 9 renders <QrLabel unit={result.unit} /> here. */}
+      <QrLabel unit={result.unit} />
 
       {summary.canPackMore ? (
         <>
