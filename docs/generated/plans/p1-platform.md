@@ -27,15 +27,17 @@ See `docs/generated/plan.md` → Global Constraints. In particular: files in pla
 
 - [ ] **Step 1: Branch and generate the app in a sibling folder** (the repo already has files, so create-next-app can't run in place)
 
+Run this from the repository root, wherever you cloned it — the script never hard-codes a path:
+
 ```bash
-cd /c/Users/seanr/MyProjects/maabara
 git checkout main && git pull && git checkout -b p1/scaffold
-cd ..
+REPO="$PWD"
+cd "$(dirname "$REPO")"
 npx create-next-app@15 maabara-scaffold --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --no-turbopack --yes
 rm -rf maabara-scaffold/.git maabara-scaffold/README.md
-cp -r maabara-scaffold/. maabara/
+cp -r maabara-scaffold/. "$REPO"/
 rm -rf maabara-scaffold
-cd maabara
+cd "$REPO"
 ```
 
 - [ ] **Step 2: Install dependencies**
