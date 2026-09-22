@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { Banner, useAction } from '@/components/ui';
 import { api } from '@/lib/api/client';
 import { ROLES, type Role } from '@/lib/contracts';
 import { ROLE_LABELS } from '@/lib/labels';
@@ -9,13 +9,16 @@ import { ROLE_LABELS } from '@/lib/labels';
 // TODO: demo mode — anyone may pick any role (spec §1).
 export default function RolePage() {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run } = useAction();
 
-  async function pick(role: Role) {
-    setBusy(true);
-    await api.setRole(role);
-    router.push(role === 'commander' ? '/command' : '/field');
-    router.refresh();
+  function pick(role: Role) {
+    void run(
+      () => api.setRole(role),
+      () => {
+        router.push(role === 'commander' ? '/command' : '/field');
+        router.refresh();
+      },
+    );
   }
 
   return (
@@ -34,6 +37,7 @@ export default function RolePage() {
             </button>
           ))}
         </div>
+        {error && <Banner tone="danger">{error}</Banner>}
       </div>
     </main>
   );
