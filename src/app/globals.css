@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Design tokens — design/design.md. Tailwind v4 turns each --color-* into bg-*/text-*/border-* utilities. */
+@theme {
+  --color-primary: #5F42FF;
+  --color-primary-soft: #D7D0FF;
+  --color-page: #665FB3;
+  --color-surface: #FFFFFF;
+  --color-subtle: #E5E5EA;
+  --color-link: #005DF5;
+  --color-ink: #1A1A1A;
+  --color-ink-muted: #6B6B76;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Status tones. Not in the design doc — chosen to sit next to the purple without competing with it. */
+  --color-ok: #1B7F3B;
+  --color-ok-soft: #E6F4EA;
+  --color-warn: #B26A00;
+  --color-warn-soft: #FDF1DF;
+  --color-danger: #C62828;
+  --color-danger-soft: #FCE8E8;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --radius-card: 20px;
+  --font-sans: var(--font-heebo), system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Field screens are operated one-handed while carrying a box: never shrink a tap target below this. */
+button,
+input,
+select {
+  font: inherit;
+}
+
+/* Task 9: printing a box label must put the label alone on the page. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-label,
+  .print-label * {
+    visibility: visible;
+  }
+  .print-label {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    width: 100%;
+  }
+  .print-hide {
+    display: none !important;
+  }
 }
