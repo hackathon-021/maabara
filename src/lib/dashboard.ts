@@ -1,4 +1,4 @@
-import type { DashboardDTO, ItemStatus, PackingUnitStatus } from '@/lib/contracts';
+import type { DashboardDTO, ItemStatus, PackingUnitStatus, RoomStatus, TransportStatus, TransportType } from '@/lib/contracts';
 import { PACKING_UNIT_STATUSES } from '@/lib/contracts';
 import { db } from '@/lib/db';
 
@@ -89,4 +89,59 @@ export async function dashboardKpis(): Promise<{
     kpis: tallyKpis(rows, mapped._sum.quantity ?? 0),
     boxCounts: tallyBoxes(boxes.map((b) => b.status as PackingUnitStatus)),
   };
+}
+
+/** Source rooms with their mapped-versus-packed progress (spec §6). */
+export async function dashboardRooms(): Promise<DashboardDTO['rooms']> {
+  const rooms = await db.room.findMany({
+    where: { isAvailable: true },
+    // Stable order: the grid must not reshuffle under a 3-second poll.
+    orderBy: [{ groupId: 'asc' }, { description: 'asc' }],
+    select: {
+      id: true,
+      description: true,
+      status: true,
+      group: { select: { name: true } },
+      mappingReports: { where: { isAvailable: true }, select: { status: true, quantity: true } },
+      packingUnits: { select: { items: { select: { quantity: true } } } },
+    },
+  });
+
+  return rooms.map((r) => ({
+    id: r.id,
+    groupName: r.group.name,
+    description: r.description,
+    status: r.status as RoomStatus,
+    mappedQty: r.mappingReports
+      .filter((m) => m.status !== 'disposal')
+      .reduce((sum, m) => sum + m.quantity, 0),
+    packedQty: r.packingUnits.reduce(
+      (sum, u) => sum + u.items.reduce((inner, i) => inner + i.quantity, 0),
+      0,
+    ),
+  }));
+}
+
+/** Transport units, newest first (spec §6). */
+export async function dashboardTrucks(): Promise<DashboardDTO['trucks']> {
+  const trucks = await db.transportUnit.findMany({
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      licensePlate: true,
+      type: true,
+      status: true,
+      departedAt: true,
+      _count: { select: { packingUnits: true } },
+    },
+  });
+
+  return trucks.map((t) => ({
+    id: t.id,
+    licensePlate: t.licensePlate,
+    type: t.type as TransportType,
+    status: t.status as TransportStatus,
+    boxCount: t._count.packingUnits,
+    departedAt: t.departedAt?.toISOString() ?? null,
+  }));
 }
