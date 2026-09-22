@@ -96,7 +96,7 @@ export async function dashboardRooms(): Promise<DashboardDTO['rooms']> {
   const rooms = await db.room.findMany({
     where: { isAvailable: true },
     // Stable order: the grid must not reshuffle under a 3-second poll.
-    orderBy: [{ groupId: 'asc' }, { description: 'asc' }],
+    orderBy: [{ groupId: 'asc' }, { description: 'asc' }, { id: 'asc' }],
     select: {
       id: true,
       description: true,
@@ -125,7 +125,7 @@ export async function dashboardRooms(): Promise<DashboardDTO['rooms']> {
 /** Transport units, newest first (spec §6). */
 export async function dashboardTrucks(): Promise<DashboardDTO['trucks']> {
   const trucks = await db.transportUnit.findMany({
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     select: {
       id: true,
       licensePlate: true,
