@@ -21,4 +21,5 @@ export const Errors = {
   notFound: (what: string) => new AppError('NOT_FOUND', `${what} לא נמצא`, 404),
   validation: (messageHe: string) => new AppError('VALIDATION', messageHe, 400),
   unauthenticated: () => new AppError('UNAUTHENTICATED', 'יש להתחבר מחדש', 401),
+  forbidden: (messageHe: string) => new AppError('FORBIDDEN', messageHe, 403),
 };
