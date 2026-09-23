@@ -13,7 +13,11 @@ export function AppHeader({ title, backHref, right }: { title: string; backHref?
           right
         )}
       </div>
-      <h1 className="flex-1 text-center text-lg font-bold">{title}</h1>
+      <div className="flex flex-1 items-center justify-center gap-2">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static local asset, no next/image optimizer configured (design/design.md) */}
+        <img src="/logo.png" alt="" className="h-7 w-7 shrink-0 object-contain" />
+        <h1 className="text-lg font-bold">{title}</h1>
+      </div>
       <div className="flex min-w-24 justify-end">{backHref ? right : null}</div>
     </header>
   );
