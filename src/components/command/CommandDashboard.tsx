@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { Banner, describeError, Spinner } from '@/components/ui';
+import type { DashboardDTO } from '@/lib/contracts';
 import { api } from '@/lib/api/client';
 import { HeroProgress, KpiTiles } from './KpiTiles';
 import { freshnessLabel } from './logic';
+import { RoomBoxes } from './RoomBoxes';
+import { RoomsGrid } from './RoomsGrid';
 
 /** Spec §1: poll every 3 seconds. No WebSockets. */
 const POLL_MS = 3000;
@@ -23,6 +26,8 @@ export function CommandDashboard() {
     return () => clearInterval(t);
   }, []);
 
+  const [openRoom, setOpenRoom] = useState<DashboardDTO['rooms'][number] | null>(null);
+
   // Only a dashboard that has never loaded shows an error instead of content.
   if (error && !data) return <Banner tone="danger">{describeError(error).messageHe}</Banner>;
   if (!data) return <Spinner label="טוען תמונת מצב…" />;
@@ -37,6 +42,16 @@ export function CommandDashboard() {
 
       <HeroProgress kpis={data.kpis} />
       <KpiTiles kpis={data.kpis} />
+
+      <RoomsGrid rooms={data.rooms} onOpen={setOpenRoom} />
+
+      {openRoom && (
+        <RoomBoxes
+          roomId={openRoom.id}
+          roomName={openRoom.description}
+          onClose={() => setOpenRoom(null)}
+        />
+      )}
     </div>
   );
 }

@@ -50,3 +50,20 @@ export function freshnessLabel(generatedAt: string, now: number): string {
   if (age < 60) return `עודכן לפני ${age} שניות`;
   return `עודכן לפני ${Math.round(age / 60)} דקות`;
 }
+
+/**
+ * Rooms under their section heading. The server already returns them grouped and
+ * sorted; this keeps a group together even if that ever changes, and preserves
+ * arrival order so the grid does not reshuffle under the poll.
+ */
+export function roomsByGroup(
+  rooms: DashboardDTO['rooms'],
+): { groupName: string; rooms: DashboardDTO['rooms'] }[] {
+  const groups: { groupName: string; rooms: DashboardDTO['rooms'] }[] = [];
+  for (const room of rooms) {
+    const existing = groups.find((g) => g.groupName === room.groupName);
+    if (existing) existing.rooms.push(room);
+    else groups.push({ groupName: room.groupName, rooms: [room] });
+  }
+  return groups;
+}

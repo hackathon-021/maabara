@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DashboardDTO } from '@/lib/contracts';
 import { formatHeDateTime } from '@/components/command/format';
-import { freshnessLabel, handledTotal, kpiTiles, progressPercent } from '@/components/command/logic';
+import { freshnessLabel, handledTotal, kpiTiles, progressPercent, roomsByGroup } from '@/components/command/logic';
 
 const kpis = (over: Partial<DashboardDTO['kpis']> = {}): DashboardDTO['kpis'] => ({
   totalMapped: 40,
@@ -126,5 +126,43 @@ describe('formatHeDateTime', () => {
 
   it('shows a dash when there is no timestamp', () => {
     expect(formatHeDateTime(null)).toBe('—');
+  });
+});
+
+const room = (id: number, groupName: string, description: string, over: Partial<DashboardDTO['rooms'][number]> = {}) => ({
+  id,
+  groupName,
+  description,
+  status: 'done' as const,
+  mappedQty: 10,
+  packedQty: 0,
+  ...over,
+});
+
+describe('roomsByGroup', () => {
+  it('groups rooms under their section, keeping the order they arrived in', () => {
+    const grouped = roomsByGroup([
+      room(1, 'ענף תקשוב', 'חדר 101'),
+      room(2, 'ענף תקשוב', 'חדר 102'),
+      room(3, 'ענף לוגיסטיקה', 'חדר 201'),
+    ]);
+    expect(grouped.map((g) => g.groupName)).toEqual(['ענף תקשוב', 'ענף לוגיסטיקה']);
+    expect(grouped[0].rooms.map((r) => r.description)).toEqual(['חדר 101', 'חדר 102']);
+    expect(grouped[1].rooms).toHaveLength(1);
+  });
+
+  it('keeps a group together even when its rooms are not adjacent', () => {
+    const grouped = roomsByGroup([
+      room(1, 'ענף תקשוב', 'חדר 101'),
+      room(3, 'ענף לוגיסטיקה', 'חדר 201'),
+      room(2, 'ענף תקשוב', 'חדר 102'),
+    ]);
+    expect(grouped).toHaveLength(2);
+    expect(grouped[0].rooms).toHaveLength(2);
+  });
+
+  // Review Focus 2.
+  it('returns nothing for an operation with no rooms', () => {
+    expect(roomsByGroup([])).toEqual([]);
   });
 });
