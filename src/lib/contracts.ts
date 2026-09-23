@@ -69,6 +69,8 @@ export interface MeDTO {
   role: Role | null;
   /** Total StatusEvent rows where this user was the actor — used for badge ranking. */
   actionCount: number;
+  /** Whether this user's rank permits picking the 'commander' operational role. */
+  canBeCommander: boolean;
 }
 
 export interface GroupDTO {
