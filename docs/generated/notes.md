@@ -20,3 +20,25 @@
   - Multi-phone SWR staleness (two people scanning the same truck at once).
   - The dashboard's live view of the SMS/notification rows and exception list (P5's UI) — only the underlying `notifications` table rows were checked directly via SQL.
   - Denying camera permission on a real device and completing a leg on the keypad alone.
+
+## P5 — commander dashboard
+
+- `GET /api/dashboard` is one query set per request, polled every 3s. KPIs count item quantities; `boxCounts` counts cartons.
+- The six KPI buckets partition the packed universe exactly; a `short` item splits between `distributed` and `short`.
+- `totalMapped` counts transfer + salvage only — a disposal item is never packed.
+- Loss states carry a glyph and a label, never a colour alone: warn and ok are indistinguishable under protanopia in this palette (ΔE 3.1), and warn/danger are only ΔE 13.3 apart with full colour vision. `חסר`/`✕` (danger) and `בחוסר`/`!` (warn) are the fix.
+- A failed poll keeps the last good numbers on screen (`if (error && !data)` is the only error-blanks-the-page path; once loaded, errors render a note beside the stale numbers instead).
+- Known shortcut: the read models aggregate in JS (`// TODO` in `dashboard.ts`), and `src/components/command/format.ts` is a near-duplicate of P4's `src/app/field/format.ts` — worth folding into one shared module if there's time.
+- **Environment note, same wall P4 hit**: no Docker/WSL2 in this build environment either. Used the same real local PostgreSQL 14 Windows service, pointed `.env`/`.env.test` at `postgres:postgres@localhost:5432/maabara_{dev,test}`. `npm test` passes (290/290 across the whole repo with this workstream's tasks included).
+- **What was actually verified end-to-end in this run** (real server + real Postgres, via `npm run dev` + direct calls into `src/lib/lifecycle` and `curl` against the live API — no browser, no phone, no projector were available in this environment):
+  - Ran a full pack → load → receive → distribute chain through the *real* lifecycle functions (not synthetic DB rows): packed two boxes out of room 101, loaded both onto a truck, received only one (the other went `missing`), distributed the received one with nothing handed over (went `short` for its full quantity).
+  - Hit `GET /api/dashboard` afterward and checked the KPI row **by hand**, as the plan's Task 9 Step 2 asks: `packed(0) + inTransit(0) + received(0) + distributed(0) + missing(1) + short(1) = 2`, which is exactly the sum of `packing_unit_items.quantity` across every item ever packed in this run. `totalMapped` was 14 throughout, matching the seed's transfer+salvage total. The tally never disagreed with the database.
+  - Confirmed the exceptions panel's two rows matched the chain exactly: `אריזה 10002 מחדר 101` (`missing_box`) and `מחשב נייד: פוזרו 0 מתוך 1` (`short_item`) — the description string format from Task 1's spec, byte-for-byte.
+  - Confirmed all 3 SMS rows appeared newest-first and in the right Hebrew, matching the load/receive-with-missing/distribute-with-shortage sequence the demo script (plan §5, Task 9 Step 1) describes.
+  - Separately, for box search: seeded a box through a full close→pack→load→receive history and confirmed `GET /api/packing-units/by-code/:code` plus `GET /api/packing-units/:id/timeline` return exactly the demo script's expected timeline, oldest-first, with correct Hebrew labels at every step; confirmed a nonexistent code 404s with a Hebrew `messageHe`.
+  - Fixed a real bug found in code review during Task 8: `BoxSearch.tsx`'s search dialog didn't clear itself before a new lookup, so a stale "found" dialog could hide a subsequent not-found error banner underneath it (the banner renders in the page, the dialog is a full-screen overlay on top). One-line fix, re-reviewed, confirmed addressed.
+- **What was NOT verified in this run, and needs a human pass before the real demo** (no phones, no deployed URL, no projector, no browser/screenshot tool were available in this environment):
+  - Actual on-screen rendering: the RTL meter fill direction, the two-column panel layout, the dialog open/close interaction, and the search field's busy/error states. Static analysis (no `dir` override, no `flex-row-reverse`, correct SWR/state wiring) strongly supports correctness, but none of it was seen rendered in a browser.
+  - The grayscale/protanopia legibility check for the missing-vs-short exception badges (plan Task 7 Step 10, Task 9 Step 5) — the glyph+label distinction is unit-tested and code-reviewed, but not eyeballed under a colour-vision emulator or an actual projector.
+  - The hour-long soak test (Task 9 Step 3): memory growth, SMS feed cap behaviour, and the kill-server-for-30s-and-recover flow, all under real continuous polling over an hour.
+  - Multi-actor live demo on separate physical devices with one laptop left untouched on `/command` the whole time (Task 9 Step 1's literal setup) — the equivalent chain was run and cross-checked programmatically instead (see above), which verifies the same numbers but not the live multi-device visual experience.
