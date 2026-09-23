@@ -263,3 +263,11 @@ export interface SetRankReq {
   userId: number;
   rank: Rank;
 }
+
+export interface LeaderboardEntryDTO {
+  id: number;
+  name: string;
+  rank: Rank;
+  role: Role | null;
+  actionCount: number;
+}
