@@ -22,6 +22,7 @@ export function BoxSearch() {
     }
     setBusy(true);
     setError(null);
+    setFound(null);
     try {
       const unit = await api.packingUnitByCode(code);
       const events = await api.timeline(unit.id);
@@ -45,6 +46,7 @@ export function BoxSearch() {
             onChange={(v) => {
               setTyped(v);
               setError(null);
+              setFound(null);
             }}
             inputMode="numeric"
             maxLength={5}
