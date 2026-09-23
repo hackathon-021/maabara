@@ -1,8 +1,8 @@
 import type {
-  ApiError, ClosePackingUnitReq, ClosePackingUnitResult, CreateTransportReq, DashboardDTO,
+  ApiError, AssignSubordinateReq, ClosePackingUnitReq, ClosePackingUnitResult, CreateTransportReq, DashboardDTO,
   DistributeReq, ErrorCode, GroupDTO, LoadReq, MeDTO, OpenPackingUnitReq, PackableItemDTO,
   PackingUnitDTO, PackingUnitStatus, PackingUnitSummaryDTO, ReceiveReq, ReceiveResult, Role,
-  RoomDTO, SetItemsReq, TimelineEventDTO, TransportStatus, TransportUnitDTO,
+  RoomDTO, SetItemsReq, SetRankReq, SubordinateStatusDTO, TimelineEventDTO, TransportStatus, TransportUnitDTO,
 } from '@/lib/contracts';
 
 export class ApiClientError extends Error {
@@ -15,7 +15,7 @@ export class ApiClientError extends Error {
   }
 }
 
-async function call<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {
+async function call<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
@@ -69,4 +69,9 @@ export const api = {
   timeline: (packingUnitId: number) =>
     call<TimelineEventDTO[]>('GET', `/api/packing-units/${packingUnitId}/timeline`),
   dashboard: () => call<DashboardDTO>('GET', '/api/dashboard'),
+
+  assignSubordinate: (req: AssignSubordinateReq) => call<{ ok: true }>('POST', '/api/command/subordinates', req),
+  removeSubordinate: (id: number) => call<{ ok: true }>('DELETE', `/api/command/subordinates/${id}`),
+  setRank: (req: SetRankReq) => call<{ ok: true }>('PATCH', '/api/command/rank', req),
+  subtree: () => call<SubordinateStatusDTO[]>('GET', '/api/command/subtree'),
 };

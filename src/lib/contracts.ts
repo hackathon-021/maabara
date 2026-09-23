@@ -3,6 +3,16 @@
 export const ROLES = ['packer', 'transporter', 'unloader', 'distributor', 'commander'] as const;
 export type Role = (typeof ROLES)[number];
 
+export const RANKS = ['soldier', 'ramad', 'raan', 'unit_commander'] as const;
+export type Rank = (typeof RANKS)[number];
+
+export const RANK_LEVEL: Record<Rank, number> = {
+  soldier: 0,
+  ramad: 1,
+  raan: 2,
+  unit_commander: 3,
+};
+
 export const PACKING_UNIT_TYPES = ['professional_carton', 'personal_carton', 'pallet', 'trolley', 'loose'] as const;
 export type PackingUnitType = (typeof PACKING_UNIT_TYPES)[number];
 
@@ -42,6 +52,7 @@ export type ErrorCode =
   | 'NOT_FOUND'
   | 'VALIDATION'
   | 'UNAUTHENTICATED'
+  | 'FORBIDDEN'
   | 'INTERNAL';
 
 export interface ApiError {
@@ -232,4 +243,23 @@ export interface DistributeReq {
 }
 export interface SetRoleReq {
   role: Role;
+}
+
+export interface SubordinateStatusDTO {
+  id: number;
+  name: string;
+  email: string;
+  rank: Rank;
+  role: Role | null;
+  commanderId: number | null;
+  lastActivityAt: string | null;
+  lastActivityLabel: string | null;
+}
+
+export interface AssignSubordinateReq {
+  subordinateId: number;
+}
+export interface SetRankReq {
+  userId: number;
+  rank: Rank;
 }

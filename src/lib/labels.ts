@@ -1,5 +1,5 @@
 import type {
-  ItemStatus, MappingStatus, PackingUnitStatus, PackingUnitType, Role, RoomStatus,
+  ItemStatus, MappingStatus, PackingUnitStatus, PackingUnitType, Rank, Role, RoomStatus,
   TransportStatus, TransportType,
 } from './contracts';
 
@@ -9,6 +9,13 @@ export const ROLE_LABELS: Record<Role, string> = {
   unloader: 'פורק',
   distributor: 'מפזר',
   commander: 'מפקד',
+};
+
+export const RANK_LABELS: Record<Rank, string> = {
+  soldier: 'חייל',
+  ramad: 'רמ"ד',
+  raan: 'רע"נ',
+  unit_commander: 'מפקד יחידה',
 };
 
 export const PACKING_UNIT_TYPE_LABELS: Record<PackingUnitType, string> = {

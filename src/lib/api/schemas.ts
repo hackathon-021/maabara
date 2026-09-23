@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BOX_CODE_RE, PACKING_UNIT_STATUSES, PACKING_UNIT_TYPES, TRANSPORT_STATUSES, TRANSPORT_TYPES } from '@/lib/contracts';
+import { BOX_CODE_RE, PACKING_UNIT_STATUSES, PACKING_UNIT_TYPES, RANKS, TRANSPORT_STATUSES, TRANSPORT_TYPES } from '@/lib/contracts';
 
 /**
  * Membership check written as a refinement rather than z.enum, so it takes the frozen
@@ -54,3 +54,8 @@ export const distributeSchema = z.object({
   items: z.array(z.object({ packingUnitItemId: idParamSchema, quantity: quantitySchema })),
   atRoom: shortTextSchema,
 });
+
+export const rankSchema = oneOf(RANKS, 'דרגה לא חוקית');
+
+export const assignSubordinateSchema = z.object({ subordinateId: idParamSchema });
+export const setRankSchema = z.object({ userId: idParamSchema, rank: rankSchema });
