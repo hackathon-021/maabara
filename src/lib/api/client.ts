@@ -1,9 +1,11 @@
 import type {
   ApiError, ClosePackingUnitReq, ClosePackingUnitResult, CreateTransportReq, DashboardDTO,
-  DistributeReq, ErrorCode, GroupDTO, LoadReq, MeDTO, OpenPackingUnitReq, PackableItemDTO,
+  DistributeReq, ErrorCode, GroupDTO,
+  LeaderboardEntryDTO,
+  LoadReq, MeDTO, OpenPackingUnitReq, PackableItemDTO,
   PackingUnitDTO, PackingUnitStatus, PackingUnitSummaryDTO, PendingApprovalDTO, ReceiveReq, ReceiveResult,
   RequestApprovalReq, Role, RoomDTO, SetItemsReq, SetRankReq, SubordinateStatusDTO, TeamPackingStatDTO,
-  TimelineEventDTO, TransportStatus, TransportUnitDTO,
+  TimelineEventDTO, TransportStatus, TransportUnitDTO
 } from '@/lib/contracts';
 
 export class ApiClientError extends Error {
@@ -79,4 +81,6 @@ export const api = {
   pendingApprovals: () => call<PendingApprovalDTO[]>('GET', '/api/command/approval-requests'),
   approveRequest: (id: number) => call<{ ok: true }>('POST', `/api/command/approval-requests/${id}/approve`),
   rejectRequest: (id: number) => call<{ ok: true }>('POST', `/api/command/approval-requests/${id}/reject`),
+
+  leaderboard: () => call<LeaderboardEntryDTO[]>('GET', '/api/leaderboard'),
 };
