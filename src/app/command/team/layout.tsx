@@ -3,13 +3,11 @@ import { RoleSwitcher } from '@/components/RoleSwitcher';
 import { hasCommanderPermission } from '@/lib/command';
 import { requirePageActor } from '@/lib/session';
 
-// Per-request: the header shows who is signed in.
 export const dynamic = 'force-dynamic';
 
-export default async function FieldLayout({ children }: { children: React.ReactNode }) {
+export default async function TeamLayout({ children }: { children: React.ReactNode }) {
   const actor = await requirePageActor();
   return (
-    // Purple app frame with a rounded white "phone screen" inset, matching /login's card-on-purple look (design/design.md).
     <div className="flex h-dvh justify-center bg-page p-3">
       <div className="flex h-full w-full max-w-md flex-col overflow-hidden rounded-3xl bg-surface shadow-lg">
         <AppHeader

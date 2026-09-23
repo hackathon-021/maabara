@@ -6,7 +6,7 @@ import { api } from '@/lib/api/client';
 import { RANKS, RANK_LEVEL, type Rank, type SubordinateStatusDTO } from '@/lib/contracts';
 import { RANK_LABELS, ROLE_LABELS } from '@/lib/labels';
 
-export function TeamView({ actorRank }: { actorRank: Rank }) {
+export function TeamView({ actorId, actorRank }: { actorId: number; actorRank: Rank }) {
   const [subordinates, setSubordinates] = useState<SubordinateStatusDTO[] | null>(null);
   const [newSubordinateId, setNewSubordinateId] = useState('');
   const { busy, error, run } = useAction();
@@ -81,9 +81,11 @@ export function TeamView({ actorRank }: { actorRank: Rank }) {
                     onChange={(r) => promote(s.id, r)}
                   />
                 )}
-                <Button variant="quiet" size="md" onClick={() => remove(s.id)} busy={busy}>
-                  הסר משיוך ישיר
-                </Button>
+                {s.commanderId === actorId && (
+                  <Button variant="quiet" size="md" onClick={() => remove(s.id)} busy={busy}>
+                    הסר משיוך ישיר
+                  </Button>
+                )}
               </div>
             </Card>
           ))}

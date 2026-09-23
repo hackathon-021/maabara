@@ -26,6 +26,11 @@ export async function assignSubordinate(actorId: number, subordinateId: number):
   if (await isAncestor(subordinateId, actorId)) {
     throw Errors.validation('שיוך זה יוצר מעגל בשרשרת הפיקוד');
   }
+  const subordinate = await db.user.findUnique({ where: { id: subordinateId } });
+  if (!subordinate) throw Errors.notFound('משתמש');
+  if (RANK_LEVEL[subordinate.rank as Rank] >= RANK_LEVEL[actor.rank as Rank]) {
+    throw Errors.validation('לא ניתן לשייך אליך משתמש בדרגה שווה או גבוהה משלך');
+  }
   await db.user.update({ where: { id: subordinateId }, data: { commanderId: actorId } });
 }
 
@@ -45,6 +50,11 @@ export async function setRank(actorId: number, targetId: number, newRank: Rank):
   const actor = await db.user.findUniqueOrThrow({ where: { id: actorId } });
   if (!hasCommanderPermission(actor.rank as Rank)) throw Errors.forbidden('אין הרשאת מפקד');
   if (!(await isAncestor(actorId, targetId))) throw Errors.validation('משתמש זה אינו בשרשרת הפיקוד שלך');
+  const target = await db.user.findUnique({ where: { id: targetId } });
+  if (!target) throw Errors.notFound('משתמש');
+  if (RANK_LEVEL[target.rank as Rank] >= RANK_LEVEL[actor.rank as Rank]) {
+    throw Errors.validation('לא ניתן לשנות דרגה של משתמש בדרגה שווה או גבוהה משלך');
+  }
   if (RANK_LEVEL[newRank] >= RANK_LEVEL[actor.rank as Rank]) {
     throw Errors.validation('לא ניתן להעניק דרגה השווה או גבוהה משלך');
   }
@@ -101,6 +111,7 @@ export async function getSubordinateStatuses(actorId: number): Promise<Subordina
     email: u.email,
     rank: u.rank as Rank,
     role: u.role as Role | null,
+    commanderId: u.commanderId,
     lastActivityAt: latest.get(u.id)?.at.toISOString() ?? null,
     lastActivityLabel: latest.get(u.id)?.label ?? null,
   }));

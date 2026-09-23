@@ -6,7 +6,7 @@ import { ROLES, type Role } from '@/lib/contracts';
 import { ROLE_LABELS } from '@/lib/labels';
 
 /** Compact role dropdown + sign-out link, for the field and command headers. */
-export function RoleSwitcher({ role }: { role: Role | null }) {
+export function RoleSwitcher({ role, showTeamLink }: { role: Role | null; showTeamLink: boolean }) {
   const router = useRouter();
 
   async function change(next: Role) {
@@ -17,6 +17,11 @@ export function RoleSwitcher({ role }: { role: Role | null }) {
 
   return (
     <div className="flex items-center gap-2 text-sm">
+      {showTeamLink && (
+        <a href="/command/team" className="text-[#005DF5]">
+          הצוות שלי
+        </a>
+      )}
       <select
         aria-label="החלפת תפקיד"
         value={role ?? ''}

@@ -80,6 +80,26 @@ describe('command hierarchy', () => {
       await assignSubordinate(commanderB, soldier);
       expect((await db.user.findUniqueOrThrow({ where: { id: soldier } })).commanderId).toBe(commanderB);
     });
+
+    // C1: a peer (unrelated, same rank) cannot be captured as a subordinate.
+    it('rejects assigning a peer of equal rank (no relation) as a subordinate', async () => {
+      const actor = await makeUser('a@x.local', 'raan');
+      const peer = await makeUser('p@x.local', 'raan');
+      await expect(assignSubordinate(actor, peer)).rejects.toMatchObject({ code: 'VALIDATION' });
+    });
+
+    // C1: a higher-ranked, unrelated user also cannot be captured.
+    it('rejects assigning a higher-ranked user (no relation) as a subordinate', async () => {
+      const actor = await makeUser('a@x.local', 'ramad');
+      const senior = await makeUser('sen@x.local', 'raan');
+      await expect(assignSubordinate(actor, senior)).rejects.toMatchObject({ code: 'VALIDATION' });
+    });
+
+    // I3: a nonexistent subordinate id must surface as NOT_FOUND, not a generic 500.
+    it('rejects a nonexistent subordinate id with NOT_FOUND', async () => {
+      const actor = await makeUser('a@x.local', 'ramad');
+      await expect(assignSubordinate(actor, 999999)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
   });
 
   describe('removeSubordinate', () => {
@@ -147,6 +167,19 @@ describe('command hierarchy', () => {
       const top = await makeUser('top@x.local', 'unit_commander');
       const ramad = await makeUser('r@x.local', 'ramad', top);
       await expect(setRank(top, ramad, 'soldier')).resolves.toBeUndefined();
+    });
+
+    // C1: setRank must also reject based on the target's *current* rank, not just the
+    // requested new rank — guards against a target whose rank is >= the actor's despite
+    // being positioned in the actor's subtree (a state that can arise outside the exploit
+    // chain too, e.g. direct DB seeding). Seeded directly via makeUser (bypassing
+    // assignSubordinate) since the C1 fix there now prevents this configuration from ever
+    // being reached through the app layer.
+    it('rejects setRank when the target current rank is not strictly below the actor', async () => {
+      const actor = await makeUser('actor@x.local', 'raan');
+      const target = await makeUser('target@x.local', 'raan', actor);
+      expect(await isAncestor(actor, target)).toBe(true);
+      await expect(setRank(actor, target, 'soldier')).rejects.toMatchObject({ code: 'VALIDATION' });
     });
   });
 
