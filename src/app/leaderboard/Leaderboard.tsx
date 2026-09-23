@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Banner, Card, EmptyState, Spinner, useAction } from '@/components/ui';
 import { api } from '@/lib/api/client';
 import type { LeaderboardEntryDTO } from '@/lib/contracts';
-import { RANK_LABELS, ROLE_LABELS } from '@/lib/labels';
+import { RANK_LABELS } from '@/lib/labels';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -39,11 +39,11 @@ export function Leaderboard() {
             return (
               <Card
                 key={entry.id}
-                className={`flex-1 text-center ${isFirst ? 'border-2 border-primary pb-6' : ''}`}
+                className={`min-w-0 flex-1 text-center ${isFirst ? 'border-2 border-primary pb-6' : ''}`}
               >
                 <p className="text-2xl">{MEDALS[place - 1]}</p>
                 <p className="mt-1 truncate font-bold">{entry.name}</p>
-                <p className="text-sm text-ink-muted">{entry.actionCount} פעולות</p>
+                <p className="truncate text-sm text-ink-muted">{entry.actionCount} פעולות</p>
               </Card>
             );
           })}
@@ -53,17 +53,16 @@ export function Leaderboard() {
       <div className="flex flex-col gap-3">
         {entries.map((entry, i) => (
           <Card key={entry.id} className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="w-6 text-center font-bold text-ink-muted">{i + 1}</span>
-              <div>
-                <p className="font-bold">{entry.name}</p>
-                <p className="text-sm text-ink-muted">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <span className="shrink-0 w-6 text-center font-bold text-ink-muted">{i + 1}</span>
+              <div className="min-w-0">
+                <p className="truncate font-bold">{entry.name}</p>
+                <p className="truncate text-sm text-ink-muted">
                   {RANK_LABELS[entry.rank]}
-                  {entry.role && ` · ${ROLE_LABELS[entry.role]}`}
                 </p>
               </div>
             </div>
-            <span className="font-bold text-primary">{entry.actionCount}</span>
+            <span className="shrink-0 font-bold text-primary">{entry.actionCount}</span>
           </Card>
         ))}
       </div>

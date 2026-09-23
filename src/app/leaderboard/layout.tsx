@@ -14,6 +14,7 @@ export default async function LeaderboardLayout({ children }: { children: React.
           title="טבלת דירוג"
           backHref={actor.role === 'commander' ? '/command' : '/field'}
           right={<RoleSwitcher role={actor.role} showTeamLink={hasCommanderPermission(actor.rank)} />}
+          showLeaderboardLink={false}
         />
         <main className="flex-1 overflow-y-auto p-4 pb-10">{children}</main>
       </div>
