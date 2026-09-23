@@ -1,6 +1,6 @@
 import { hasCommanderPermission } from '@/lib/command';
 import type { PendingApprovalDTO, Rank } from '@/lib/contracts';
-import { RANK_LEVEL } from '@/lib/contracts';
+import { RANK_LEVEL, RANKS } from '@/lib/contracts';
 import { db } from '@/lib/db';
 import { Errors } from '@/lib/errors';
 
@@ -42,15 +42,18 @@ async function loadPendingRequest(actorId: number, subordinateId: number) {
   return { actor, subordinate };
 }
 
-/** Sets commanderId and locks it — from here on only a direct DB edit can move this user. */
+/**
+ * Sets commanderId and locks it — from here on only a direct DB edit can move
+ * this user. Approval also auto-promotes the subordinate to one rank below
+ * the approving commander (e.g. a unit_commander's approved requester becomes
+ * a raan), overriding whatever rank they held while pending.
+ */
 export async function approveRequest(actorId: number, subordinateId: number): Promise<void> {
-  const { actor, subordinate } = await loadPendingRequest(actorId, subordinateId);
-  if (RANK_LEVEL[subordinate.rank as Rank] >= RANK_LEVEL[actor.rank as Rank]) {
-    throw Errors.validation('לא ניתן לאשר משתמש בדרגה שווה או גבוהה משלך');
-  }
+  const { actor } = await loadPendingRequest(actorId, subordinateId);
+  const newRank = RANKS[RANK_LEVEL[actor.rank as Rank] - 1];
   await db.user.update({
     where: { id: subordinateId },
-    data: { commanderId: actorId, approvalStatus: 'approved' },
+    data: { commanderId: actorId, approvalStatus: 'approved', rank: newRank },
   });
 }
 
