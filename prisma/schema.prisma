@@ -96,6 +96,11 @@ model User {
   name              String
   /// packer | transporter | unloader | distributor | commander (null until picked)
   role              String?
+  /// soldier | ramad | raan | unit_commander
+  rank              String          @default("soldier")
+  commanderId       Int?            @map("commander_id")
+  commander         User?           @relation("CommandChain", fields: [commanderId], references: [id])
+  subordinates      User[]          @relation("CommandChain")
   identityNum       String?         @map("identity_num") @db.VarChar(10)
   createdAt         DateTime        @default(now()) @map("created_at")
   packedUnits       PackingUnit[]   @relation("PackedBy")
