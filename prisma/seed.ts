@@ -49,7 +49,12 @@ async function main() {
   await report(r201.id, 'מכשיר קשר', 'transfer', 3, 'MK-2231');
   await report(r201.id, 'כספת', 'transfer', 1, 'SF-09');
 
-  await db.user.create({ data: { email: 'dev@maabara.local', name: 'משתמש פיתוח', role: 'commander', rank: 'unit_commander' } });
+  await db.user.create({
+    data: {
+      email: 'dev@maabara.local', name: 'משתמש פיתוח', role: 'commander', rank: 'unit_commander',
+      approvalStatus: 'approved', isAdmin: true,
+    },
+  });
 }
 
 main()

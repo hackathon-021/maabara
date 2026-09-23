@@ -1,19 +1,27 @@
 import type { User } from '@prisma/client';
-import { ROLES, type MeDTO, type Role } from '@/lib/contracts';
+import { hasCommanderPermission } from '@/lib/command';
+import { ROLES, type MeDTO, type Rank, type Role } from '@/lib/contracts';
 import { db } from '@/lib/db';
 import { Errors } from '@/lib/errors';
 
 export function toMeDTO(u: User): MeDTO {
   // actionCount defaults to 0 here; callers that need the real count should query StatusEvent.
-  return { id: u.id, email: u.email, name: u.name, role: u.role as Role | null, actionCount: 0 };
+  return {
+    id: u.id, email: u.email, name: u.name, role: u.role as Role | null, actionCount: 0,
+    canBeCommander: hasCommanderPermission(u.rank as Rank),
+  };
 }
 
 export async function ensureUser(email: string, name: string): Promise<User> {
   return db.user.upsert({ where: { email }, update: {}, create: { email, name } });
 }
 
-export async function setUserRole(userId: number, role: string): Promise<MeDTO> {
+/** The 'commander' operational role is only pickable by ranks with commander permission. */
+export async function setUserRole(userId: number, actorRank: Rank, role: string): Promise<MeDTO> {
   if (!(ROLES as readonly string[]).includes(role)) throw Errors.validation('תפקיד לא חוקי');
+  if (role === 'commander' && !hasCommanderPermission(actorRank)) {
+    throw Errors.forbidden('אין הרשאת מפקד');
+  }
   return toMeDTO(await db.user.update({ where: { id: userId }, data: { role } }));
 }
 

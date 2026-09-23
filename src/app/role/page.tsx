@@ -8,7 +8,6 @@ import { ROLES, type MeDTO, type Role } from '@/lib/contracts';
 import { ROLE_LABELS } from '@/lib/labels';
 import { getBadge, getNextBadge } from '@/lib/badges';
 
-// TODO: demo mode — anyone may pick any role (spec §1).
 export default function RolePage() {
   const router = useRouter();
   const { busy, error, run } = useAction();
@@ -110,7 +109,7 @@ export default function RolePage() {
         >
           <h1 className="text-xl font-bold mb-4 text-center">מה התפקיד שלך היום?</h1>
           <div className="flex flex-col gap-3">
-            {ROLES.map((role) => (
+            {(me && !me.canBeCommander ? ROLES.filter((r) => r !== 'commander') : ROLES).map((role) => (
               <button
                 key={role}
                 disabled={busy}

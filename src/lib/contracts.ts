@@ -69,6 +69,8 @@ export interface MeDTO {
   role: Role | null;
   /** Total StatusEvent rows where this user was the actor — used for badge ranking. */
   actionCount: number;
+  /** Whether this user's rank permits picking the 'commander' operational role. */
+  canBeCommander: boolean;
 }
 
 export interface GroupDTO {
@@ -258,15 +260,36 @@ export interface SubordinateStatusDTO {
   lastActivityLabel: string | null;
 }
 
-export interface AssignSubordinateReq {
-  subordinateId: number;
-}
 export interface SetRankReq {
   userId: number;
   rank: Rank;
 }
 
-export interface LeaderboardEntryDTO {
+export type ApprovalStatus = 'pending' | 'approved';
+
+export interface PendingApprovalDTO {
+  id: number;
+  name: string;
+  email: string;
+  rank: Rank;
+}
+
+export interface RequestApprovalReq {
+  commanderId: number;
+}
+
+/** One row per subtree member: own packing output, and (own + everyone under them) rolled up. */
+export interface TeamPackingStatDTO {
+  id: number;
+  name: string;
+  rank: Rank;
+  commanderId: number | null;
+  ownBoxCount: number;
+  ownItemCount: number;
+  totalBoxCount: number;
+  totalItemCount: number;
+}
+  export interface LeaderboardEntryDTO {
   id: number;
   name: string;
   rank: Rank;

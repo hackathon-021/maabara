@@ -15,6 +15,10 @@ export function RoleSwitcher({ role, showTeamLink }: { role: Role | null; showTe
     router.refresh();
   }
 
+  // Only ranks with commander permission (ramad/raan/unit_commander) may pick the
+  // 'commander' operational role — showTeamLink already carries that same check.
+  const pickableRoles = showTeamLink ? ROLES : ROLES.filter((r) => r !== 'commander');
+
   return (
     <div className="flex items-center gap-2 text-sm">
       {showTeamLink && (
@@ -28,7 +32,7 @@ export function RoleSwitcher({ role, showTeamLink }: { role: Role | null; showTe
         onChange={(e) => change(e.target.value as Role)}
         className="rounded-full border border-[#E5E5EA] bg-white px-3 py-1"
       >
-        {ROLES.map((r) => (
+        {pickableRoles.map((r) => (
           <option key={r} value={r}>
             {ROLE_LABELS[r]}
           </option>

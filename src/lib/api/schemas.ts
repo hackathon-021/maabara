@@ -57,5 +57,5 @@ export const distributeSchema = z.object({
 
 export const rankSchema = oneOf(RANKS, 'דרגה לא חוקית');
 
-export const assignSubordinateSchema = z.object({ subordinateId: idParamSchema });
 export const setRankSchema = z.object({ userId: idParamSchema, rank: rankSchema });
+export const requestApprovalSchema = z.object({ commanderId: idParamSchema });
