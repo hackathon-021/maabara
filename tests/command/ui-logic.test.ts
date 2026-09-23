@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DashboardDTO } from '@/lib/contracts';
 import { formatHeDateTime } from '@/components/command/format';
-import { exceptionBadge, freshnessLabel, handledTotal, kpiTiles, progressPercent, roomsByGroup } from '@/components/command/logic';
+import { exceptionBadge, freshnessLabel, handledTotal, kpiTiles, parseSearchCode, progressPercent, roomsByGroup } from '@/components/command/logic';
 
 const kpis = (over: Partial<DashboardDTO['kpis']> = {}): DashboardDTO['kpis'] => ({
   totalMapped: 40,
@@ -187,5 +187,25 @@ describe('exceptionBadge', () => {
     expect(missing.glyph).not.toBe(short.glyph);
     expect(missing.label).not.toBe(short.label);
     expect(missing.tone).not.toBe(short.tone);
+  });
+});
+
+describe('parseSearchCode', () => {
+  it('accepts a bare five-digit code', () => {
+    expect(parseSearchCode('10001')).toBe('10001');
+  });
+
+  it('tolerates the spaces a commander types or pastes', () => {
+    expect(parseSearchCode('  10001 ')).toBe('10001');
+  });
+
+  // Review Focus 5: a search box is the one field anyone types anything into.
+  it('refuses anything that is not exactly five digits', () => {
+    expect(parseSearchCode('1234')).toBeNull();
+    expect(parseSearchCode('123456')).toBeNull();
+    expect(parseSearchCode('')).toBeNull();
+    expect(parseSearchCode('   ')).toBeNull();
+    expect(parseSearchCode('מחשב')).toBeNull();
+    expect(parseSearchCode('1000a')).toBeNull();
   });
 });

@@ -82,3 +82,13 @@ export function exceptionBadge(kind: 'missing_box' | 'short_item'): {
     ? { glyph: '✕', label: 'אריזה חסרה', tone: 'danger' }
     : { glyph: '!', label: 'פריט בחוסר', tone: 'warn' };
 }
+
+/**
+ * A typed box code, or null. Deliberately stricter than the field scanner's
+ * normalizer: a commander types this by hand from a printed label, so a five-digit
+ * string is the only thing worth sending to the server.
+ */
+export function parseSearchCode(raw: string): string | null {
+  const trimmed = raw.trim();
+  return /^\d{5}$/.test(trimmed) ? trimmed : null;
+}

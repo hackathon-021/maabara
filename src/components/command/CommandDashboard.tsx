@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { Banner, describeError, Spinner } from '@/components/ui';
 import { api } from '@/lib/api/client';
 import type { DashboardDTO } from '@/lib/contracts';
+import { BoxSearch } from './BoxSearch';
 import { ExceptionsPanel } from './ExceptionsPanel';
 import { HeroProgress, KpiTiles } from './KpiTiles';
 import { freshnessLabel } from './logic';
@@ -43,6 +44,7 @@ export function CommandDashboard() {
         {error && <p className="text-sm text-white">אין תקשורת עם השרת — המספרים אינם מתעדכנים</p>}
       </div>
 
+      <BoxSearch />
       <HeroProgress kpis={data.kpis} />
       <KpiTiles kpis={data.kpis} />
 
