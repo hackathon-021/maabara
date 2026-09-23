@@ -40,6 +40,5 @@ export async function requireActor(): Promise<Actor> {
 export async function requirePageActor(): Promise<Actor> {
   const actor = await currentActor();
   if (!actor) redirect('/login');
-  if (!actor.role) redirect('/role');
   return actor;
 }

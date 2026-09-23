@@ -25,6 +25,7 @@ export function OptionList<T extends string | number>({
           <li key={String(o.value)}>
             <button
               type="button"
+              disabled={o.disabled}
               onClick={() => onChange(o.value)}
               aria-pressed={selected}
               className={`flex min-h-16 w-full flex-col justify-center rounded-card border-2 px-4 text-right ${
