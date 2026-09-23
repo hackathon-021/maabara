@@ -24,7 +24,7 @@ export function TeamView({
   }, []);
 
   const promotableRanks = RANKS.filter(
-    (r) => RANK_LEVEL[r] < RANK_LEVEL[actorRank] || (actorIsAdmin && r === 'unit_commander'),
+    (r) => RANK_LEVEL[r] === RANK_LEVEL[actorRank] - 1 || (actorIsAdmin && r === 'unit_commander'),
   );
 
   function approve(id: number) {

@@ -45,8 +45,8 @@ export async function setRank(actorId: number, targetId: number, newRank: Rank):
   if (RANK_LEVEL[target.rank as Rank] >= RANK_LEVEL[actor.rank as Rank]) {
     throw Errors.validation('לא ניתן לשנות דרגה של משתמש בדרגה שווה או גבוהה משלך');
   }
-  if (RANK_LEVEL[newRank] >= RANK_LEVEL[actor.rank as Rank]) {
-    throw Errors.validation('לא ניתן להעניק דרגה השווה או גבוהה משלך');
+  if (RANK_LEVEL[newRank] !== RANK_LEVEL[actor.rank as Rank] - 1) {
+    throw Errors.validation('ניתן להעניק דרגה אחת מתחת לדרגתך בלבד');
   }
   await db.user.update({ where: { id: targetId }, data: { rank: newRank } });
   if (newRank === 'soldier') {
