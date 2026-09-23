@@ -17,7 +17,7 @@ export const DEV_EMAIL = 'dev@maabara.local';
 export async function devActor(): Promise<Actor> {
   const u = await db.user.upsert({
     where: { email: DEV_EMAIL },
-    update: {},
+    update: { rank: 'unit_commander' },
     create: { email: DEV_EMAIL, name: 'משתמש פיתוח', role: 'commander', rank: 'unit_commander' },
   });
   return { id: u.id, name: u.name, email: u.email, role: u.role as Role | null, rank: u.rank as Rank };
