@@ -256,10 +256,32 @@ export interface SubordinateStatusDTO {
   lastActivityLabel: string | null;
 }
 
-export interface AssignSubordinateReq {
-  subordinateId: number;
-}
 export interface SetRankReq {
   userId: number;
   rank: Rank;
+}
+
+export type ApprovalStatus = 'pending' | 'approved';
+
+export interface PendingApprovalDTO {
+  id: number;
+  name: string;
+  email: string;
+  rank: Rank;
+}
+
+export interface RequestApprovalReq {
+  commanderId: number;
+}
+
+/** One row per subtree member: own packing output, and (own + everyone under them) rolled up. */
+export interface TeamPackingStatDTO {
+  id: number;
+  name: string;
+  rank: Rank;
+  commanderId: number | null;
+  ownBoxCount: number;
+  ownItemCount: number;
+  totalBoxCount: number;
+  totalItemCount: number;
 }

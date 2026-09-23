@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/lib/db';
 import {
-  assignSubordinate, getSubordinateStatuses, getSubtreeIds, hasCommanderPermission,
-  isAncestor, removeSubordinate, setRank,
+  getSubordinateStatuses, getSubtreeIds, getTeamPackingStats, hasCommanderPermission, isAncestor, setRank,
 } from '@/lib/command';
 import type { Rank } from '@/lib/contracts';
 import { resetDb } from '../helpers/db';
 
-async function makeUser(email: string, rank: Rank, commanderId: number | null = null): Promise<number> {
-  const u = await db.user.create({ data: { email, name: email, rank, commanderId } });
+async function makeUser(
+  email: string, rank: Rank, commanderId: number | null = null, isAdmin = false,
+): Promise<number> {
+  const u = await db.user.create({ data: { email, name: email, rank, commanderId, isAdmin } });
   return u.id;
 }
 
@@ -47,79 +48,6 @@ describe('command hierarchy', () => {
     });
   });
 
-  describe('assignSubordinate', () => {
-    it('sets the direct link when the actor has commander permission', async () => {
-      const commander = await makeUser('c@x.local', 'ramad');
-      const soldier = await makeUser('s@x.local', 'soldier');
-      await assignSubordinate(commander, soldier);
-      expect((await db.user.findUniqueOrThrow({ where: { id: soldier } })).commanderId).toBe(commander);
-    });
-
-    it('rejects a soldier acting as commander', async () => {
-      const soldier = await makeUser('s@x.local', 'soldier');
-      const target = await makeUser('t@x.local', 'soldier');
-      await expect(assignSubordinate(soldier, target)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    });
-
-    it('rejects self-assignment', async () => {
-      const commander = await makeUser('c@x.local', 'ramad');
-      await expect(assignSubordinate(commander, commander)).rejects.toMatchObject({ code: 'VALIDATION' });
-    });
-
-    it('rejects a cycle (assigning your own ancestor as your subordinate)', async () => {
-      const top = await makeUser('top@x.local', 'unit_commander');
-      const middle = await makeUser('mid@x.local', 'raan', top);
-      await expect(assignSubordinate(middle, top)).rejects.toMatchObject({ code: 'VALIDATION' });
-    });
-
-    // Review Focus 3.
-    it('reassigns a subordinate who already has a different commander', async () => {
-      const commanderA = await makeUser('a@x.local', 'ramad');
-      const commanderB = await makeUser('b@x.local', 'ramad');
-      const soldier = await makeUser('s@x.local', 'soldier', commanderA);
-      await assignSubordinate(commanderB, soldier);
-      expect((await db.user.findUniqueOrThrow({ where: { id: soldier } })).commanderId).toBe(commanderB);
-    });
-
-    // C1: a peer (unrelated, same rank) cannot be captured as a subordinate.
-    it('rejects assigning a peer of equal rank (no relation) as a subordinate', async () => {
-      const actor = await makeUser('a@x.local', 'raan');
-      const peer = await makeUser('p@x.local', 'raan');
-      await expect(assignSubordinate(actor, peer)).rejects.toMatchObject({ code: 'VALIDATION' });
-    });
-
-    // C1: a higher-ranked, unrelated user also cannot be captured.
-    it('rejects assigning a higher-ranked user (no relation) as a subordinate', async () => {
-      const actor = await makeUser('a@x.local', 'ramad');
-      const senior = await makeUser('sen@x.local', 'raan');
-      await expect(assignSubordinate(actor, senior)).rejects.toMatchObject({ code: 'VALIDATION' });
-    });
-
-    // I3: a nonexistent subordinate id must surface as NOT_FOUND, not a generic 500.
-    it('rejects a nonexistent subordinate id with NOT_FOUND', async () => {
-      const actor = await makeUser('a@x.local', 'ramad');
-      await expect(assignSubordinate(actor, 999999)).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    });
-  });
-
-  describe('removeSubordinate', () => {
-    it('removes a direct link', async () => {
-      const commander = await makeUser('c@x.local', 'ramad');
-      const soldier = await makeUser('s@x.local', 'soldier', commander);
-      await removeSubordinate(commander, soldier);
-      expect((await db.user.findUniqueOrThrow({ where: { id: soldier } })).commanderId).toBeNull();
-    });
-
-    // Review Focus 2.
-    it('rejects removing a grandchild (not a direct report)', async () => {
-      const top = await makeUser('top@x.local', 'raan');
-      const middle = await makeUser('mid@x.local', 'ramad', top);
-      const leaf = await makeUser('leaf@x.local', 'soldier', middle);
-      await expect(removeSubordinate(top, leaf)).rejects.toMatchObject({ code: 'VALIDATION' });
-      expect((await db.user.findUniqueOrThrow({ where: { id: leaf } })).commanderId).toBe(middle);
-    });
-  });
-
   describe('setRank', () => {
     it('promotes a descendant to a strictly lower rank than the actor', async () => {
       const top = await makeUser('top@x.local', 'unit_commander');
@@ -147,10 +75,12 @@ describe('command hierarchy', () => {
       await expect(setRank(top, mid, 'raan')).rejects.toMatchObject({ code: 'VALIDATION' });
     });
 
+    // unit_commander is the one exception: promoting to it always requires isAdmin,
+    // checked before the normal rank-gap comparison (see the admin-bypass tests below).
     it('rejects promoting above the actor own rank', async () => {
       const top = await makeUser('top@x.local', 'ramad');
       const soldier = await makeUser('s@x.local', 'soldier', top);
-      await expect(setRank(top, soldier, 'unit_commander')).rejects.toMatchObject({ code: 'VALIDATION' });
+      await expect(setRank(top, soldier, 'unit_commander')).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
 
     it('cascades: demoting to soldier orphans that user own direct subordinates', async () => {
@@ -180,6 +110,24 @@ describe('command hierarchy', () => {
       const target = await makeUser('target@x.local', 'raan', actor);
       expect(await isAncestor(actor, target)).toBe(true);
       await expect(setRank(actor, target, 'soldier')).rejects.toMatchObject({ code: 'VALIDATION' });
+    });
+
+    it('rejects promoting to unit_commander without isAdmin, even as unit_commander', async () => {
+      const top = await makeUser('top@x.local', 'unit_commander');
+      const raan = await makeUser('r@x.local', 'raan', top);
+      await expect(setRank(top, raan, 'unit_commander')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('admin promotes anyone to unit_commander, even outside their own subtree', async () => {
+      const admin = await makeUser('admin@x.local', 'unit_commander', null, true);
+      const stranger = await makeUser('x@x.local', 'raan');
+      await setRank(admin, stranger, 'unit_commander');
+      expect((await db.user.findUniqueOrThrow({ where: { id: stranger } })).rank).toBe('unit_commander');
+    });
+
+    it('rejects unit_commander promotion of a nonexistent user with NOT_FOUND', async () => {
+      const admin = await makeUser('admin@x.local', 'unit_commander', null, true);
+      await expect(setRank(admin, 999999, 'unit_commander')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 
@@ -237,6 +185,59 @@ describe('command hierarchy', () => {
       const [row] = await getSubordinateStatuses(commander);
       expect(row.lastActivityAt).toBe(new Date(2026, 8, 22).toISOString());
       expect(row.lastActivityLabel).toBeTruthy();
+    });
+  });
+
+  describe('getTeamPackingStats', () => {
+    async function makeRoom(): Promise<number> {
+      const group = await db.group.create({ data: { name: 'קבוצת בדיקה' } });
+      const room = await db.room.create({ data: { groupId: group.id, description: 'חדר', status: 'done' } });
+      return room.id;
+    }
+
+    async function makeBox(packedById: number, roomId: number, itemQuantities: number[] = []): Promise<void> {
+      const box = await db.packingUnit.create({ data: { type: 'loose', sourceRoomId: roomId, packedById } });
+      for (const quantity of itemQuantities) {
+        const cat = await db.category.create({ data: { description: 'קטגוריה' } });
+        const sub = await db.subCategory.create({ data: { categoryId: cat.id, description: 'תת קטגוריה' } });
+        const report = await db.mappingReport.create({
+          data: { roomId, subCategoryId: sub.id, status: 'transfer', quantity, reportedBy: '1234567' },
+        });
+        await db.packingUnitItem.create({ data: { packingUnitId: box.id, mappingReportId: report.id, quantity } });
+      }
+    }
+
+    it('rejects a soldier actor', async () => {
+      const soldier = await makeUser('s@x.local', 'soldier');
+      await expect(getTeamPackingStats(soldier)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('returns an empty array for a commander with nobody assigned yet', async () => {
+      const commander = await makeUser('c@x.local', 'ramad');
+      expect(await getTeamPackingStats(commander)).toEqual([]);
+    });
+
+    it('reports own box and item counts for a direct subordinate', async () => {
+      const commander = await makeUser('c@x.local', 'ramad');
+      const soldier = await makeUser('s@x.local', 'soldier', commander);
+      const roomId = await makeRoom();
+      await makeBox(soldier, roomId, [2, 3]);
+      const [row] = await getTeamPackingStats(commander);
+      expect(row).toMatchObject({
+        id: soldier, ownBoxCount: 1, ownItemCount: 5, totalBoxCount: 1, totalItemCount: 5,
+      });
+    });
+
+    it('rolls up a ramad own packing plus everyone under them', async () => {
+      const top = await makeUser('top@x.local', 'raan');
+      const ramad = await makeUser('r@x.local', 'ramad', top);
+      const soldier = await makeUser('s@x.local', 'soldier', ramad);
+      const roomId = await makeRoom();
+      await makeBox(ramad, roomId, [1]);
+      await makeBox(soldier, roomId, [4]);
+      const stats = await getTeamPackingStats(top);
+      const ramadRow = stats.find((s) => s.id === ramad);
+      expect(ramadRow).toMatchObject({ ownBoxCount: 1, ownItemCount: 1, totalBoxCount: 2, totalItemCount: 5 });
     });
   });
 });

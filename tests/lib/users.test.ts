@@ -6,11 +6,12 @@ import { resetDb } from '../helpers/db';
 describe('users', () => {
   beforeEach(resetDb);
 
-  it('ensureUser is idempotent per email and starts without a role', async () => {
+  it('ensureUser is idempotent per email and starts without a role, pending approval', async () => {
     const a = await ensureUser('a@gmail.com', 'A');
     const b = await ensureUser('a@gmail.com', 'A again');
     expect(b.id).toBe(a.id);
     expect(a.role).toBeNull();
+    expect(a.approvalStatus).toBe('pending');
     expect(await db.user.count()).toBe(1);
   });
 

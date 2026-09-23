@@ -101,6 +101,12 @@ model User {
   commanderId       Int?            @map("commander_id")
   commander         User?           @relation("CommandChain", fields: [commanderId], references: [id])
   subordinates      User[]          @relation("CommandChain")
+  /// pending | approved. Locks commanderId once approved — see /lib/approval.ts.
+  approvalStatus    String          @default("pending") @map("approval_status")
+  /// Commander id requested at signup; cleared on rejection, consumed into commanderId on approval.
+  requestedCommanderId Int?         @map("requested_commander_id")
+  /// Grants promotion to unit_commander (setRank), bypassing the normal hierarchy check. Set directly in the DB.
+  isAdmin           Boolean         @default(false) @map("is_admin")
   identityNum       String?         @map("identity_num") @db.VarChar(10)
   createdAt         DateTime        @default(now()) @map("created_at")
   packedUnits       PackingUnit[]   @relation("PackedBy")

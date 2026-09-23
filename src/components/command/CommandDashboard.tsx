@@ -12,12 +12,13 @@ import { freshnessLabel } from './logic';
 import { RoomBoxes } from './RoomBoxes';
 import { RoomsGrid } from './RoomsGrid';
 import { SmsFeed } from './SmsFeed';
+import { TeamPackingPanel } from './TeamPackingPanel';
 import { TrucksPanel } from './TrucksPanel';
 
 /** Spec §1: poll every 3 seconds. No WebSockets. */
 const POLL_MS = 3000;
 
-export function CommandDashboard() {
+export function CommandDashboard({ showTeamPacking }: { showTeamPacking: boolean }) {
   const { data, error } = useSWR('dashboard', api.dashboard, {
     refreshInterval: POLL_MS,
     keepPreviousData: true,
@@ -47,6 +48,8 @@ export function CommandDashboard() {
       <BoxSearch />
       <HeroProgress kpis={data.kpis} />
       <KpiTiles kpis={data.kpis} />
+
+      {showTeamPacking && <TeamPackingPanel />}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">

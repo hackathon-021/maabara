@@ -1,18 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Banner, Button, Card, EmptyState, OptionList, TextField, useAction } from '@/components/ui';
+import { Banner, Button, Card, EmptyState, OptionList, useAction } from '@/components/ui';
 import { api } from '@/lib/api/client';
-import { RANKS, RANK_LEVEL, type Rank, type SubordinateStatusDTO } from '@/lib/contracts';
+import { RANKS, RANK_LEVEL, type PendingApprovalDTO, type Rank, type SubordinateStatusDTO } from '@/lib/contracts';
 import { RANK_LABELS, ROLE_LABELS } from '@/lib/labels';
 
-export function TeamView({ actorId, actorRank }: { actorId: number; actorRank: Rank }) {
+export function TeamView({
+  actorRank, actorIsAdmin,
+}: { actorRank: Rank; actorIsAdmin: boolean }) {
   const [subordinates, setSubordinates] = useState<SubordinateStatusDTO[] | null>(null);
-  const [newSubordinateId, setNewSubordinateId] = useState('');
+  const [pending, setPending] = useState<PendingApprovalDTO[] | null>(null);
   const { busy, error, run } = useAction();
 
   function load() {
     void run(() => api.subtree(), setSubordinates);
+    void run(() => api.pendingApprovals(), setPending);
   }
 
   useEffect(() => {
@@ -20,22 +23,16 @@ export function TeamView({ actorId, actorRank }: { actorId: number; actorRank: R
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const promotableRanks = RANKS.filter((r) => RANK_LEVEL[r] < RANK_LEVEL[actorRank]);
+  const promotableRanks = RANKS.filter(
+    (r) => RANK_LEVEL[r] < RANK_LEVEL[actorRank] || (actorIsAdmin && r === 'unit_commander'),
+  );
 
-  function assign() {
-    const subordinateId = Number(newSubordinateId);
-    if (!Number.isInteger(subordinateId) || subordinateId <= 0) return;
-    void run(
-      () => api.assignSubordinate({ subordinateId }),
-      () => {
-        setNewSubordinateId('');
-        load();
-      },
-    );
+  function approve(id: number) {
+    void run(() => api.approveRequest(id), load);
   }
 
-  function remove(id: number) {
-    void run(() => api.removeSubordinate(id), load);
+  function reject(id: number) {
+    void run(() => api.rejectRequest(id), load);
   }
 
   function promote(userId: number, rank: Rank) {
@@ -46,21 +43,31 @@ export function TeamView({ actorId, actorRank }: { actorId: number; actorRank: R
     <div className="flex flex-col gap-4 p-4">
       <h1 className="text-xl font-bold">הצוות שלי</h1>
 
-      <Card>
-        <p className="mb-2 font-bold">שיוך פקוד</p>
-        {/* TODO: numeric id entry until a user-directory search endpoint exists. */}
-        <TextField label="מזהה משתמש" value={newSubordinateId} onChange={setNewSubordinateId} inputMode="numeric" />
-        <div className="mt-2">
-          <Button onClick={assign} busy={busy} disabled={!newSubordinateId}>
-            שייך
-          </Button>
-        </div>
-      </Card>
-
       {error && <Banner tone="danger">{error}</Banner>}
 
+      <div>
+        <p className="mb-2 font-bold">בקשות ממתינות לאישור</p>
+        {pending !== null && pending.length === 0 && (
+          <EmptyState title="אין בקשות ממתינות" body="בקשות הצטרפות אליך יופיעו כאן" />
+        )}
+        {pending !== null && pending.length > 0 && (
+          <div className="flex flex-col gap-3">
+            {pending.map((p) => (
+              <Card key={p.id}>
+                <p className="font-bold">{p.name}</p>
+                <p className="text-sm text-ink-muted">{p.email} · {RANK_LABELS[p.rank]}</p>
+                <div className="mt-2 flex gap-2">
+                  <Button size="md" onClick={() => approve(p.id)} busy={busy}>אשר</Button>
+                  <Button variant="quiet" size="md" onClick={() => reject(p.id)} busy={busy}>דחה</Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
       {subordinates !== null && subordinates.length === 0 && (
-        <EmptyState title="אין פקודים עדיין" body="שייכו פקוד ראשון כדי לראות אותו כאן" />
+        <EmptyState title="אין פקודים עדיין" body="אשרו בקשת הצטרפות ראשונה כדי לראות אותה כאן" />
       )}
 
       {subordinates !== null && subordinates.length > 0 && (
@@ -73,20 +80,15 @@ export function TeamView({ actorId, actorRank }: { actorId: number; actorRank: R
                 {s.role && ` · ${ROLE_LABELS[s.role]}`}
               </p>
               <p className="text-sm text-ink-muted">{s.lastActivityLabel ?? 'אין פעילות עדיין'}</p>
-              <div className="mt-2 flex flex-col gap-2">
-                {promotableRanks.length > 0 && (
+              {promotableRanks.length > 0 && (
+                <div className="mt-2">
                   <OptionList
                     options={promotableRanks.map((r) => ({ value: r, label: RANK_LABELS[r] }))}
                     value={s.rank}
                     onChange={(r) => promote(s.id, r)}
                   />
-                )}
-                {s.commanderId === actorId && (
-                  <Button variant="quiet" size="md" onClick={() => remove(s.id)} busy={busy}>
-                    הסר משיוך ישיר
-                  </Button>
-                )}
-              </div>
+                </div>
+              )}
             </Card>
           ))}
         </div>

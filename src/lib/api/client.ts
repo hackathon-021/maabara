@@ -1,8 +1,9 @@
 import type {
-  ApiError, AssignSubordinateReq, ClosePackingUnitReq, ClosePackingUnitResult, CreateTransportReq, DashboardDTO,
+  ApiError, ClosePackingUnitReq, ClosePackingUnitResult, CreateTransportReq, DashboardDTO,
   DistributeReq, ErrorCode, GroupDTO, LoadReq, MeDTO, OpenPackingUnitReq, PackableItemDTO,
-  PackingUnitDTO, PackingUnitStatus, PackingUnitSummaryDTO, ReceiveReq, ReceiveResult, Role,
-  RoomDTO, SetItemsReq, SetRankReq, SubordinateStatusDTO, TimelineEventDTO, TransportStatus, TransportUnitDTO,
+  PackingUnitDTO, PackingUnitStatus, PackingUnitSummaryDTO, PendingApprovalDTO, ReceiveReq, ReceiveResult,
+  RequestApprovalReq, Role, RoomDTO, SetItemsReq, SetRankReq, SubordinateStatusDTO, TeamPackingStatDTO,
+  TimelineEventDTO, TransportStatus, TransportUnitDTO,
 } from '@/lib/contracts';
 
 export class ApiClientError extends Error {
@@ -70,8 +71,12 @@ export const api = {
     call<TimelineEventDTO[]>('GET', `/api/packing-units/${packingUnitId}/timeline`),
   dashboard: () => call<DashboardDTO>('GET', '/api/dashboard'),
 
-  assignSubordinate: (req: AssignSubordinateReq) => call<{ ok: true }>('POST', '/api/command/subordinates', req),
-  removeSubordinate: (id: number) => call<{ ok: true }>('DELETE', `/api/command/subordinates/${id}`),
   setRank: (req: SetRankReq) => call<{ ok: true }>('PATCH', '/api/command/rank', req),
   subtree: () => call<SubordinateStatusDTO[]>('GET', '/api/command/subtree'),
+  teamStats: () => call<TeamPackingStatDTO[]>('GET', '/api/command/team-stats'),
+
+  requestApproval: (req: RequestApprovalReq) => call<{ ok: true }>('POST', '/api/approval/request', req),
+  pendingApprovals: () => call<PendingApprovalDTO[]>('GET', '/api/command/approval-requests'),
+  approveRequest: (id: number) => call<{ ok: true }>('POST', `/api/command/approval-requests/${id}/approve`),
+  rejectRequest: (id: number) => call<{ ok: true }>('POST', `/api/command/approval-requests/${id}/reject`),
 };
