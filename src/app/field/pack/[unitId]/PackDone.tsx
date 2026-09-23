@@ -28,8 +28,8 @@ export function PackDone({ result }: { result: ClosePackingUnitResult }) {
           {/* TODO: no API exists yet for "packer declares the room finished" while items remain —
               both buttons below are pure navigation today. Needs a P1/P2 contract addition
               (flows/packing_flow.md node U) before this distinction can be real. */}
-          <Button variant="secondary" onClick={() => router.push('/field/pack')}>
-            לא נותרו פריטים לאריזה
+          <Button variant="secondary" onClick={() => router.push('/field')}>
+            אין יותר פריטים לאריזה
           </Button>
           <Button variant="quiet" size="md" onClick={() => router.push('/field')}>
             הפסקה זמנית באריזה

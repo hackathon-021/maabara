@@ -67,6 +67,8 @@ export interface MeDTO {
   email: string;
   name: string;
   role: Role | null;
+  /** Total StatusEvent rows where this user was the actor — used for badge ranking. */
+  actionCount: number;
 }
 
 export interface GroupDTO {
