@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DashboardDTO } from '@/lib/contracts';
 import { formatHeDateTime } from '@/components/command/format';
-import { freshnessLabel, handledTotal, kpiTiles, progressPercent, roomsByGroup } from '@/components/command/logic';
+import { exceptionBadge, freshnessLabel, handledTotal, kpiTiles, progressPercent, roomsByGroup } from '@/components/command/logic';
 
 const kpis = (over: Partial<DashboardDTO['kpis']> = {}): DashboardDTO['kpis'] => ({
   totalMapped: 40,
@@ -164,5 +164,28 @@ describe('roomsByGroup', () => {
   // Review Focus 2.
   it('returns nothing for an operation with no rooms', () => {
     expect(roomsByGroup([])).toEqual([]);
+  });
+});
+
+describe('exceptionBadge', () => {
+  it('names a missing box in Hebrew', () => {
+    expect(exceptionBadge('missing_box')).toEqual({ glyph: '✕', label: 'אריזה חסרה', tone: 'danger' });
+  });
+
+  it('names a short item in Hebrew', () => {
+    expect(exceptionBadge('short_item')).toEqual({ glyph: '!', label: 'פריט בחוסר', tone: 'warn' });
+  });
+
+  /**
+   * Review Focus 1: danger #C62828 and warn #B26A00 measure ΔE 13.3 apart with full
+   * colour vision — below the threshold at which a reader can tell them apart. The
+   * two kinds of loss must never be distinguished by tone alone.
+   */
+  it('separates the two kinds of loss by glyph and by label, not only by tone', () => {
+    const missing = exceptionBadge('missing_box');
+    const short = exceptionBadge('short_item');
+    expect(missing.glyph).not.toBe(short.glyph);
+    expect(missing.label).not.toBe(short.label);
+    expect(missing.tone).not.toBe(short.tone);
   });
 });

@@ -67,3 +67,18 @@ export function roomsByGroup(
   }
   return groups;
 }
+
+/**
+ * How a loss is marked. Glyph first, then a Hebrew label, then a tone — in that
+ * order of importance, because the two tones are close enough to be confused even
+ * by a reader with full colour vision (ΔE 13.3) and identical under protanopia.
+ */
+export function exceptionBadge(kind: 'missing_box' | 'short_item'): {
+  glyph: string;
+  label: string;
+  tone: 'danger' | 'warn';
+} {
+  return kind === 'missing_box'
+    ? { glyph: '✕', label: 'אריזה חסרה', tone: 'danger' }
+    : { glyph: '!', label: 'פריט בחוסר', tone: 'warn' };
+}

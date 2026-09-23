@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { Banner, describeError, Spinner } from '@/components/ui';
-import type { DashboardDTO } from '@/lib/contracts';
 import { api } from '@/lib/api/client';
+import type { DashboardDTO } from '@/lib/contracts';
+import { ExceptionsPanel } from './ExceptionsPanel';
 import { HeroProgress, KpiTiles } from './KpiTiles';
 import { freshnessLabel } from './logic';
 import { RoomBoxes } from './RoomBoxes';
 import { RoomsGrid } from './RoomsGrid';
+import { SmsFeed } from './SmsFeed';
+import { TrucksPanel } from './TrucksPanel';
 
 /** Spec §1: poll every 3 seconds. No WebSockets. */
 const POLL_MS = 3000;
@@ -19,14 +22,14 @@ export function CommandDashboard() {
     keepPreviousData: true,
   });
 
+  const [openRoom, setOpenRoom] = useState<DashboardDTO['rooms'][number] | null>(null);
+
   // Re-render once a second so the freshness line counts up between polls.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-
-  const [openRoom, setOpenRoom] = useState<DashboardDTO['rooms'][number] | null>(null);
 
   // Only a dashboard that has never loaded shows an error instead of content.
   if (error && !data) return <Banner tone="danger">{describeError(error).messageHe}</Banner>;
@@ -43,7 +46,18 @@ export function CommandDashboard() {
       <HeroProgress kpis={data.kpis} />
       <KpiTiles kpis={data.kpis} />
 
-      <RoomsGrid rooms={data.rooms} onOpen={setOpenRoom} />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <RoomsGrid rooms={data.rooms} onOpen={setOpenRoom} />
+        </div>
+        {/* Exceptions above trucks on purpose: the inspector persona opens this
+            screen to find gaps, not to admire progress. */}
+        <div className="flex flex-col gap-4">
+          <ExceptionsPanel exceptions={data.exceptions} />
+          <TrucksPanel trucks={data.trucks} />
+          <SmsFeed notifications={data.notifications} />
+        </div>
+      </div>
 
       {openRoom && (
         <RoomBoxes
