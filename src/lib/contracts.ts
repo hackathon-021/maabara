@@ -251,6 +251,7 @@ export interface SubordinateStatusDTO {
   email: string;
   rank: Rank;
   role: Role | null;
+  commanderId: number | null;
   lastActivityAt: string | null;
   lastActivityLabel: string | null;
 }
