@@ -1,6 +1,6 @@
 import type {
   ApiError, AssignSubordinateReq, ClosePackingUnitReq, ClosePackingUnitResult, CreateTransportReq, DashboardDTO,
-  DistributeReq, ErrorCode, GroupDTO, LoadReq, MeDTO, OpenPackingUnitReq, PackableItemDTO,
+  DistributeReq, ErrorCode, GroupDTO, LeaderboardEntryDTO, LoadReq, MeDTO, OpenPackingUnitReq, PackableItemDTO,
   PackingUnitDTO, PackingUnitStatus, PackingUnitSummaryDTO, ReceiveReq, ReceiveResult, Role,
   RoomDTO, SetItemsReq, SetRankReq, SubordinateStatusDTO, TimelineEventDTO, TransportStatus, TransportUnitDTO,
 } from '@/lib/contracts';
@@ -74,4 +74,6 @@ export const api = {
   removeSubordinate: (id: number) => call<{ ok: true }>('DELETE', `/api/command/subordinates/${id}`),
   setRank: (req: SetRankReq) => call<{ ok: true }>('PATCH', '/api/command/rank', req),
   subtree: () => call<SubordinateStatusDTO[]>('GET', '/api/command/subtree'),
+
+  leaderboard: () => call<LeaderboardEntryDTO[]>('GET', '/api/leaderboard'),
 };
